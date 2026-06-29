@@ -1,4 +1,25 @@
 -- =====================================================================
+--  سلّـة — RESET + CREATE (v2 schema)
+--  ⚠️  WARNING: this DROPS the listed tables and ALL their data, then
+--      recreates the clean v2 schema. Use on a prototype/dev database.
+--  Why: an earlier schema created tables with different columns; this
+--  guarantees a clean, matching structure (fixes "column ... does not exist").
+-- =====================================================================
+
+-- ---- drop in dependency order (children first); CASCADE clears FKs/policies ----
+drop table if exists public.order_items cascade;
+drop table if exists public.orders      cascade;
+drop table if exists public.products    cascade;
+drop table if exists public.categories  cascade;
+drop table if exists public.customers   cascade;   -- from the earlier prototype schema
+drop table if exists public.riders      cascade;   -- from the earlier prototype schema
+drop table if exists public.users       cascade;
+
+-- enums are recreated below; drop so the new definitions always apply
+drop type if exists order_status cascade;
+drop type if exists user_role    cascade;
+
+-- =====================================================================
 --  سلّـة — Quick Commerce Platform · Core PostgreSQL Schema (Supabase)
 --  Run this directly in: Supabase Dashboard → SQL Editor → New query → Run
 --  Safe to re-run (idempotent: IF NOT EXISTS / DROP POLICY IF EXISTS).

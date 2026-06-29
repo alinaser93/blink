@@ -181,7 +181,7 @@ function OverviewView({ orders }) {
             {recent.map((o) => (
               <div key={o.id} className="flex items-center gap-3">
                 <span className="rounded-lg flex items-center justify-center shrink-0" style={{ width: 38, height: 38, background: COLS[o.col].tint }}><Package size={17} style={{ color: COLS[o.col].accent }} /></span>
-                <div className="flex-1 min-w-0"><p className="text-sm font-bold">#{o.id}</p><p className="text-xs" style={{ color: "#9AA3AF" }}>{o.items} مواد · {COLS[o.col].title}</p></div>
+                <div className="flex-1 min-w-0"><p className="text-sm font-bold">#{o.num}</p><p className="text-xs" style={{ color: "#9AA3AF" }}>{o.items} مواد · {COLS[o.col].title}</p></div>
                 <span className="text-sm font-extrabold tabular-nums">{iqd(o.total)}</span>
               </div>
             ))}
@@ -222,7 +222,7 @@ function OrdersView({ orders, inv, riders, accept, ready, deliver }) {
                 {list.map((o) => (
                   <div key={o.id} className="kan-card rounded-xl p-3.5">
                     <div className="flex items-center justify-between">
-                      <span className="font-extrabold tabular-nums" style={{ fontSize: 15 }}>#{o.id}</span>
+                      <span className="font-extrabold tabular-nums" style={{ fontSize: 15 }}>#{o.num}</span>
                       {cid === "new" && <span className="text-xs font-bold rounded-md px-2 py-0.5 flex items-center gap-1" style={{ background: "#F1F3F6", color: "#5A6473" }}><Clock size={11} /> {o.time}</span>}
                       {cid === "packing" && <span className="text-xs font-bold rounded-md px-2 py-0.5" style={{ background: "#FBF3DA", color: "#B8932E" }}>قيد التجهيز</span>}
                       {cid === "dispatched" && <span className="text-xs font-bold rounded-md px-2 py-0.5" style={{ background: o.status === "قرب الوصول" ? "#EAF6EC" : "#E8F0FE", color: o.status === "قرب الوصول" ? "#0C831F" : "#2563EB" }}>{o.status}</span>}

@@ -58,6 +58,7 @@ git push -u origin main
 
 1. أنشئ مشروع على [supabase.com](https://supabase.com).
 2. **SQL Editor**: الصق `supabase/schema.sql` ونفّذه، ثم `supabase/seed.sql`.
+   - إذا كان عندك جداول قديمة من قبل، استخدم `supabase/schema_reset.sql` بدلاً من `schema.sql` (يمسح القديم ويبني الجديد).
 3. **Settings → API**: انسخ الـ URL والـ publishable (anon) key.
 4. انسخ `.env.example` إلى `.env` وحطّهم:
    ```
@@ -74,7 +75,8 @@ git push -u origin main
 ├── netlify.toml
 ├── .env.example
 ├── supabase/
-│   ├── schema.sql           # الجداول + RLS
+│   ├── schema.sql           # الجداول + RLS (users/categories/products/orders/order_items)
+│   ├── schema_reset.sql     # نسخة تمسح القديم ثم تبني (لقواعد فيها جداول سابقة)
 │   └── seed.sql             # بيانات أولية
 └── src/
     ├── main.jsx
