@@ -93,14 +93,14 @@ const ALL = [...SEASONAL, ...PRODUCTS];
 /* ================================================================== */
 /*  Rich product card                                                 */
 /* ================================================================== */
-function ProductCard({ p, qty, onAdd, onInc, onDec, fav, onFav }) {
+function ProductCard({ p, qty, onAdd, onInc, onDec }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <div className="flex flex-col">
       <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: "#F3F5F8", overflow: "hidden" }}>
         <div className="absolute inset-0 flex items-center justify-center"><p.Icon size={52} style={{ color: p.accent || "#9AA8B5", opacity: 0.28 }} /></div>
         {p.badge && <span className="absolute text-xs font-extrabold" style={{ top: 8, insetInlineStart: 0, background: p.badge.c, color: "#fff", padding: "3px 9px", borderStartEndRadius: 8, borderEndEndRadius: 8 }}>{p.badge.t}</span>}
-        <button onClick={onFav} className="wish absolute rounded-full flex items-center justify-center" style={{ top: 8, insetInlineEnd: 8, width: 26, height: 26, background: "#fff" }}><Heart size={14} fill={fav ? "#E11D2A" : "none"} style={{ color: fav ? "#E11D2A" : "#C7CDD6" }} /></button>
+        <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 8, insetInlineEnd: 8, width: 26, height: 26, background: "#fff" }}><Heart size={14} style={{ color: "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ bottom: 44, insetInlineEnd: 8, width: 17, height: 17, borderRadius: 3, border: "1.5px solid #1A7A33", background: "#fff" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#1A7A33" }} /></span>
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between" style={{ padding: 7 }}>
           <span className="rounded-md text-xs font-bold" style={{ background: "rgba(255,255,255,.94)", color: "#3A424E", padding: "3px 7px" }}>{p.weight}</span>
@@ -153,7 +153,7 @@ export default function CategoryPage() {
   const [activeSub, setActiveSub] = useState("الكل");
   const [bannerOpen, setBannerOpen] = useState(true);
   const nav = useNavigate();
-  const { qty, add, inc, dec, subtotal, isFav, toggleFav } = useCart();
+  const { qty, add, inc, dec, subtotal } = useCart();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(70);
@@ -167,7 +167,7 @@ export default function CategoryPage() {
   const remaining = Math.max(0, FREE_AT - subtotal);
   const card = (p) => (
     <div key={p.id} onClick={() => nav("/product")} style={{ cursor: "pointer" }}>
-      <ProductCard p={p} qty={qty(p.id)} onAdd={(e) => { e.stopPropagation(); add(p); }} onInc={(e) => { e.stopPropagation(); inc(p.id); }} onDec={(e) => { e.stopPropagation(); dec(p.id); }} fav={isFav(p.id)} onFav={(e) => { e.stopPropagation(); toggleFav(p); }} />
+      <ProductCard p={p} qty={qty(p.id)} onAdd={(e) => { e.stopPropagation(); add(p); }} onInc={(e) => { e.stopPropagation(); inc(p.id); }} onDec={(e) => { e.stopPropagation(); dec(p.id); }} />
     </div>
   );
 
@@ -261,7 +261,7 @@ export default function CategoryPage() {
           {/* more */}
           <section className="px-3 pt-6">
             <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>وصل حديثاً</h2>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{PRODUCTS.slice(4).concat(PRODUCTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} fav={isFav(p.id)} onFav={() => toggleFav(p)} />)}</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{PRODUCTS.slice(4).concat(PRODUCTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
           </section>
         </div>
       </div>
