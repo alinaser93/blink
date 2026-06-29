@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard, Activity, Boxes, Users, BarChart3, Wallet, Clock, AlertTriangle,
   Bike, Bell, Search, Plus, Pencil, Package, CheckCircle2, Settings, Store,
-  TrendingUp, ShoppingCart, UserPlus, ArrowUpRight, Minus, Loader2,
+  TrendingUp, ShoppingCart, UserPlus, ArrowUpRight, Minus, Loader2, Menu,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -21,7 +21,10 @@ const STYLE = `
 .admin { background:#FAFAFA; color:#15171A; }
 .no-scrollbar::-webkit-scrollbar { display:none; }
 .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
-.side { background:#FFFFFF; border-inline-end:1px solid #EEF0F2; }
+.side { background:#FFFFFF; border-inline-end:1px solid #EEF0F2; position:fixed; top:0; bottom:0; right:0; width:266px; z-index:95; transform:translateX(100%); transition:transform .25s ease; overflow-y:auto; }
+.side.open { transform:translateX(0); box-shadow:-12px 0 32px rgba(16,24,40,.18); }
+.side-backdrop { position:fixed; inset:0; background:rgba(16,24,40,.45); z-index:90; }
+@media (min-width:1024px){ .side{ position:sticky; top:0; right:auto; height:100vh; transform:none; box-shadow:none; z-index:1; align-self:flex-start; } .side-backdrop{ display:none; } }
 .side-item { transition:all .15s ease; color:#5A6473; position:relative; }
 .side-item:hover { background:#F5F7F9; color:#15171A; }
 .side-item.on { background:#EAF6EC; color:#0C831F; }
@@ -424,6 +427,7 @@ function Loading() {
 export default function AdminDashboard() {
   const [active, setActive] = useState("orders");
   const [open, setOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [inv, setInv] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -467,7 +471,8 @@ export default function AdminDashboard() {
     <div className="admin min-h-screen flex" dir="rtl" lang="ar">
       <style>{STYLE}</style>
 
-      <aside className="side shrink-0 flex flex-col no-scrollbar" style={{ width: 266, position: "sticky", top: 0, height: "100vh", alignSelf: "flex-start", overflowY: "auto" }}>
+      {sidebarOpen && <div className="side-backdrop" onClick={() => setSidebarOpen(false)} />}
+      <aside className={"side shrink-0 flex flex-col no-scrollbar " + (sidebarOpen ? "open" : "")}>
         <div className="flex items-center gap-3 px-5" style={{ height: 76 }}>
           <div className="brand-grad rounded-xl flex items-center justify-center shrink-0" style={{ width: 42, height: 42, boxShadow: "0 6px 16px rgba(12,131,31,.3)" }}><Store size={22} color="#fff" /></div>
           <div><p className="font-extrabold text-lg leading-none">سلّـة</p><p className="text-xs mt-1" style={{ color: "#9AA3AF" }}>لوحة التاجر</p></div>
@@ -478,7 +483,7 @@ export default function AdminDashboard() {
           {NAV.map((n) => {
             const on = active === n.id;
             return (
-              <button key={n.id} onClick={() => setActive(n.id)} className={"side-item flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold " + (on ? "on" : "")}>
+              <button key={n.id} onClick={() => { setActive(n.id); setSidebarOpen(false); }} className={"side-item flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold " + (on ? "on" : "")}>
                 {on && <span style={{ position: "absolute", insetInlineStart: -12, top: 8, bottom: 8, width: 4, borderStartEndRadius: 4, borderEndEndRadius: 4, background: "#0C831F" }} />}
                 <n.Icon size={20} strokeWidth={on ? 2.4 : 2} /><span>{n.label}</span>
                 {n.id === "orders" && <span className="pulse-dot ms-auto rounded-full" style={{ width: 8, height: 8, background: "#E11D2A" }} />}
@@ -498,16 +503,19 @@ export default function AdminDashboard() {
       <main className="flex-1 min-w-0">
         <header className="sticky top-0 z-20" style={{ background: "rgba(250,250,250,.85)", backdropFilter: "blur(8px)", borderBottom: "1px solid #EEF0F2" }}>
           <div className="flex items-center justify-between gap-4 px-6 py-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2.5"><h1 className="text-2xl font-extrabold">{head.t}</h1><span className="text-xs font-extrabold rounded-full px-2.5 py-1" style={{ background: "#EAF6EC", color: "#0C831F" }}>فرع السماوة</span></div>
-              <p className="text-sm mt-1" style={{ color: "#7A8493" }}>{head.s}</p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden icon-btn panel rounded-xl flex items-center justify-center shrink-0" style={{ width: 42, height: 42 }}><Menu size={20} /></button>
+              <div>
+                <div className="flex items-center gap-2.5"><h1 className="text-xl md:text-2xl font-extrabold">{head.t}</h1><span className="text-xs font-extrabold rounded-full px-2.5 py-1" style={{ background: "#EAF6EC", color: "#0C831F" }}>فرع السماوة</span></div>
+                <p className="text-sm mt-1" style={{ color: "#7A8493" }}>{head.s}</p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="panel rounded-xl flex items-center gap-2 px-3 py-2.5">
                 <span className="rounded-full" style={{ width: 8, height: 8, background: isLive ? "#0C831F" : "#D4AF37" }} />
                 <span className="text-xs font-extrabold" style={{ color: isLive ? "#0C831F" : "#B8932E" }}>{isLive ? "متصل بقاعدة البيانات" : "بيانات تجريبية"}</span>
               </div>
-              <LiveClock />
+              <div className="hidden md:block"><LiveClock /></div>
               <button onClick={() => setOpen((o) => !o)} className="panel rounded-xl flex items-center gap-2.5 px-3 py-2.5">
                 <span className="toggle-track rounded-full" style={{ width: 44, height: 25, background: open ? "#0C831F" : "#C7CDD6", padding: 3, justifyContent: open ? "flex-start" : "flex-end" }}><span className="toggle-knob block rounded-full" style={{ width: 19, height: 19, background: "#fff" }} /></span>
                 <span className="text-sm font-extrabold" style={{ color: open ? "#0C831F" : "#7A8493" }}>{open ? "مفتوح للطلبات" : "مغلق"}</span>
@@ -518,7 +526,7 @@ export default function AdminDashboard() {
           </div>
         </header>
 
-        <div className="p-6" style={{ maxWidth: 1480, margin: "0 auto" }}>
+        <div className="p-4 md:p-6" style={{ maxWidth: 1480, margin: "0 auto" }}>
           {loading ? <Loading /> : (
             <>
               {active === "dash" && <OverviewView orders={orders} />}
