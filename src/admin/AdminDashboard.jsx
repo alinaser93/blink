@@ -12,8 +12,10 @@ import {
 import {
   getProducts, getOrders, getCustomers, getRiders, setOrderStatus, setStock, isLive,
   getCategories, createCategory, updateCategory, deleteCategory, reorderCategory,
+  createProduct, updateProduct, deleteProduct,
   ICON_MAP, CAT_ICON, CAT_ACCENT, CATEGORY_ICONS,
 } from "../lib/api.js";
+import { emojiFor } from "../customer/emoji.js";
 
 /* ================================================================== */
 /*  Styles                                                            */
@@ -59,6 +61,8 @@ const STYLE = `
 @keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(225,29,42,.5);} 50%{ box-shadow:0 0 0 7px rgba(225,29,42,0);} }
 .spin { animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
+.ovfade { animation:ovfade .18s ease; }
+@keyframes ovfade { from{ opacity:0; } to{ opacity:1; } }
 .brand-grad { background:linear-gradient(135deg,#0C831F 0%, #0A6A19 100%); }
 .gold-grad { background:linear-gradient(135deg,#E7C66B 0%, #D4AF37 100%); }
 `;
@@ -258,12 +262,99 @@ function OrdersView({ orders, inv, riders, accept, ready, deliver }) {
   );
 }
 
-function InventoryView({ inv, onAdjust }) {
+/* ---- نموذج إضافة/تعديل منتج (مربوط بالقسم/التفرّع) ---- */
+function ProductForm({ product, cats, onSave, onClose }) {
+  const tier1 = cats.filter((c) => c.parentId == null).sort((a, b) => a.sort - b.sort);
+  const initCat = product ? cats.find((c) => c.id === product.categoryId) : null;
+  const initT1 = initCat ? (initCat.parentId == null ? initCat.id : initCat.parentId) : (tier1[0]?.id ?? "");
+  const initT2 = initCat && initCat.parentId != null ? initCat.id : "";
+  const [name, setName] = useState(product?.name || "");
+  const [t1, setT1] = useState(initT1);
+  const [t2, setT2] = useState(initT2);
+  const [price, setPrice] = useState(product != null ? String(product.price ?? "") : "");
+  const [weight, setWeight] = useState(product?.weight || "");
+  const [stk, setStk] = useState(product != null ? String(product.stock ?? 0) : "0");
+  const [emoji, setEmoji] = useState(product?.emoji || "");
+  const [mrp, setMrp] = useState(product?.mrp ? String(product.mrp) : "");
+
+  const subs = cats.filter((c) => c.parentId === t1).sort((a, b) => a.sort - b.sort);
+  const preview = emoji || emojiFor(name);
+  const fld = { border: "1px solid #E6E9EE", height: 42, borderRadius: 10, padding: "0 12px", outline: "none", background: "#fff", width: "100%" };
+  const ok = name.trim().length > 0;
+
+  const save = () => {
+    if (!ok) return;
+    onSave({ name: name.trim(), categoryId: t2 || t1 || null, price: +price || 0, stock: +stk || 0, weight: weight.trim(), mrp: +mrp || 0, emoji: emoji.trim() || null });
+  };
+
+  const Field = ({ label, children }) => (
+    <div><label className="text-xs font-bold mb-1 block" style={{ color: "#5A6473" }}>{label}</label>{children}</div>
+  );
+
+  return (
+    <div className="ovfade fixed inset-0 flex items-end sm:items-center justify-center" style={{ background: "rgba(16,24,40,.5)", zIndex: 80 }} onClick={onClose}>
+      <div className="panel rounded-2xl w-full" style={{ maxWidth: 520, maxHeight: "92vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5" style={{ borderBottom: "1px solid #F1F2F4", position: "sticky", top: 0, background: "#fff", zIndex: 1 }}>
+          <h2 className="text-lg font-extrabold">{product ? "تعديل منتج" : "منتج جديد"}</h2>
+          <button onClick={onClose} className="icon-btn rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, background: "#F1F3F6" }}><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl flex items-center justify-center shrink-0" style={{ width: 60, height: 60, background: "#F3F5F8", fontSize: 34 }}>{preview}</div>
+            <p className="text-xs" style={{ color: "#9AA3AF" }}>صورة المنتج تُعرض كإيموجي (يُشتق من الاسم تلقائياً، أو حدّده بالأسفل).</p>
+          </div>
+          <Field label="اسم المنتج"><input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="مثال: حليب طازج" className="text-sm font-bold" style={fld} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="القسم">
+              <select value={t1} onChange={(e) => { setT1(e.target.value); setT2(""); }} className="text-sm font-bold" style={fld}>
+                {tier1.length === 0 && <option value="">— لا أقسام —</option>}
+                {tier1.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label="التفرّع (اختياري)">
+              <select value={t2} onChange={(e) => setT2(e.target.value)} className="text-sm font-bold" style={fld}>
+                <option value="">— بدون تفرّع —</option>
+                {subs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="السعر (د.ع)"><input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="0" className="text-sm font-bold tabular-nums" style={fld} /></Field>
+            <Field label="الوحدة"><input value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="مثال: 1 لتر / كيلو" className="text-sm font-bold" style={fld} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="الكمية المتوفّرة"><input value={stk} onChange={(e) => setStk(e.target.value)} inputMode="numeric" placeholder="0" className="text-sm font-bold tabular-nums" style={fld} /></Field>
+            <Field label="إيموجي (اختياري)"><input value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="🥛" className="text-sm font-bold" style={{ ...fld, textAlign: "center" }} /></Field>
+          </div>
+          <Field label="السعر قبل الخصم (اختياري — يفعّل الخصم)"><input value={mrp} onChange={(e) => setMrp(e.target.value)} inputMode="numeric" placeholder="اتركه فارغاً لو ما في خصم" className="text-sm font-bold tabular-nums" style={fld} /></Field>
+        </div>
+        <div className="flex items-center gap-3 p-5" style={{ borderTop: "1px solid #F1F2F4", position: "sticky", bottom: 0, background: "#fff" }}>
+          <button onClick={save} disabled={!ok} className="btn-green rounded-xl flex-1 flex items-center justify-center gap-2 text-sm font-extrabold" style={{ padding: "12px", opacity: ok ? 1 : 0.6 }}><Check size={17} /> حفظ</button>
+          <button onClick={onClose} className="btn-ghost rounded-xl text-sm font-extrabold" style={{ padding: "12px 22px" }}>إلغاء</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InventoryView({ inv, cats, onAdjust, onAdd, onEdit, onDelete }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("الكل");
-  const rows = inv.filter((p) => (cat === "الكل" || p.cat === cat) && p.name.includes(q));
+  const [editing, setEditing] = useState(null); // product | "new" | null
+
+  const catIndex = useMemo(() => { const m = {}; cats.forEach((c) => { m[c.id] = c; }); return m; }, [cats]);
+  const resolveCat = (p) => {
+    const c = catIndex[p.categoryId];
+    if (!c) return { t1: p.cat || "أخرى", t2: null };
+    if (c.parentId == null) return { t1: c.name, t2: null };
+    return { t1: catIndex[c.parentId]?.name || "أخرى", t2: c.name };
+  };
+  const chips = ["الكل", ...cats.filter((c) => c.parentId == null).sort((a, b) => a.sort - b.sort).map((c) => c.name)];
+
+  const rows = inv.filter((p) => (cat === "الكل" || resolveCat(p).t1 === cat) && p.name.includes(q));
   const oos = inv.filter((p) => p.stock === 0).length;
   const low = inv.filter((p) => p.stock > 0 && p.stock < 10).length;
+
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -274,31 +365,33 @@ function InventoryView({ inv, onAdjust }) {
       <div className="panel rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between gap-3 p-5 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            {INV_CATS.map((c) => <button key={c} onClick={() => setCat(c)} className={"chip-f rounded-full text-xs font-bold " + (cat === c ? "on" : "")} style={{ padding: "7px 14px" }}>{c}</button>)}
+            {chips.map((c) => <button key={c} onClick={() => setCat(c)} className={"chip-f rounded-full text-xs font-bold " + (cat === c ? "on" : "")} style={{ padding: "7px 14px" }}>{c}</button>)}
           </div>
           <div className="flex items-center gap-2">
             <div className="rounded-lg flex items-center gap-2 px-3" style={{ border: "1px solid #E6E9EE", height: 40 }}>
               <Search size={16} style={{ color: "#9AA3AF" }} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث عن منتج..." className="bg-transparent outline-none text-sm" style={{ width: 130 }} />
             </div>
-            <button className="btn-green rounded-lg flex items-center gap-2 text-sm font-extrabold" style={{ padding: "9px 16px" }}><Plus size={17} /> إضافة منتج</button>
+            <button onClick={() => setEditing("new")} className="btn-green rounded-lg flex items-center gap-2 text-sm font-extrabold" style={{ padding: "9px 16px" }}><Plus size={17} /> إضافة منتج</button>
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 720 }}>
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 760 }}>
             <thead>
               <tr style={{ background: "#F7F8FA" }}>
-                {["المنتج", "القسم", "السعر", "الكمية المتوفرة", "تعديل المخزون", "الإجراء"].map((h) => <th key={h} className="text-xs font-extrabold px-5 py-3" style={{ color: "#7A8493", textAlign: "right", whiteSpace: "nowrap" }}>{h}</th>)}
+                {["المنتج", "القسم / التفرّع", "السعر", "الكمية المتوفرة", "تعديل المخزون", "الإجراء"].map((h) => <th key={h} className="text-xs font-extrabold px-5 py-3" style={{ color: "#7A8493", textAlign: "right", whiteSpace: "nowrap" }}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-sm" style={{ color: "#AEB6BF" }}>لا توجد نتائج</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={6} className="text-center py-10 text-sm" style={{ color: "#AEB6BF" }}>لا توجد منتجات — اضغط «إضافة منتج»</td></tr>}
               {rows.map((p) => {
                 const b = stockBadge(p.stock);
+                const rc = resolveCat(p);
+                const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
                 return (
-                  <tr key={p.id} className="tbl-row" style={{ borderTop: "1px solid #F2F3F5" }}>
-                    <td className="px-5 py-3"><div className="flex items-center gap-3"><div className="rounded-xl flex items-center justify-center shrink-0" style={{ width: 44, height: 44, background: "#F3F5F8" }}><p.Icon size={22} style={{ color: p.accent, opacity: 0.55 }} /></div><span className="text-sm font-bold" style={{ whiteSpace: "nowrap" }}>{p.name}</span></div></td>
-                    <td className="px-5 py-3"><span className="text-xs font-bold rounded-md px-2.5 py-1" style={{ background: "#F1F3F6", color: "#5A6473", whiteSpace: "nowrap" }}>{p.cat}</span></td>
-                    <td className="px-5 py-3"><span className="text-sm font-extrabold tabular-nums" style={{ whiteSpace: "nowrap" }}>{iqd(p.price)}</span></td>
+                  <tr key={p.id} className="tbl-row" style={{ borderTop: "1px solid #F2F3F5", opacity: p._pending ? 0.55 : 1 }}>
+                    <td className="px-5 py-3"><div className="flex items-center gap-3"><div className="rounded-xl flex items-center justify-center shrink-0" style={{ width: 44, height: 44, background: (p.accent || "#9AA8B5") + "18", fontSize: 24 }}>{p.emoji || emojiFor(p.name)}</div><div className="min-w-0"><p className="text-sm font-bold" style={{ whiteSpace: "nowrap" }}>{p.name}</p>{p.weight && <p className="text-xs" style={{ color: "#9AA3AF" }}>{p.weight}</p>}</div></div></td>
+                    <td className="px-5 py-3"><div className="flex items-center gap-1.5" style={{ whiteSpace: "nowrap" }}><span className="text-xs font-bold rounded-md px-2.5 py-1" style={{ background: "#F1F3F6", color: "#5A6473" }}>{rc.t1}</span>{rc.t2 && <span className="text-xs font-bold rounded-md px-2 py-1" style={{ background: "#E8F0FE", color: "#2563EB" }}>{rc.t2}</span>}</div></td>
+                    <td className="px-5 py-3"><div className="flex items-baseline gap-1.5" style={{ whiteSpace: "nowrap" }}><span className="text-sm font-extrabold tabular-nums">{iqd(p.price)}</span>{off > 0 && <span className="text-xs line-through tabular-nums" style={{ color: "#9AA3AF" }}>{iqd(p.mrp)}</span>}</div>{off > 0 && <span className="text-xs font-bold" style={{ color: "#2563EB" }}>خصم {off}%</span>}</td>
                     <td className="px-5 py-3"><div className="flex items-center gap-2"><span className="rounded-full" style={{ width: 8, height: 8, background: b.c }} /><span className="text-sm font-bold tabular-nums">{p.stock}</span><span className="text-xs font-extrabold rounded-full px-2 py-0.5" style={{ background: b.bg, color: b.c }}>{b.t}</span></div></td>
                     <td className="px-5 py-3">
                       <div className="inline-flex items-center gap-2">
@@ -306,7 +399,12 @@ function InventoryView({ inv, onAdjust }) {
                         <button onClick={() => onAdjust(p.id, 1)} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#0C831F" }}><Plus size={15} strokeWidth={2.6} /></button>
                       </div>
                     </td>
-                    <td className="px-5 py-3"><button className="btn-ghost rounded-lg flex items-center gap-1.5 text-sm font-bold" style={{ padding: "7px 14px" }}><Pencil size={14} /> تعديل</button></td>
+                    <td className="px-5 py-3">
+                      <div className="inline-flex items-center gap-2">
+                        <button onClick={() => setEditing(p)} className="btn-ghost rounded-lg flex items-center gap-1.5 text-sm font-bold" style={{ padding: "7px 12px" }}><Pencil size={14} /> تعديل</button>
+                        <button onClick={() => { if (window.confirm("حذف «" + p.name + "»؟")) onDelete(p.id); }} className="icon-btn rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, color: "#E11D2A", background: "#FDECEC" }}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -314,6 +412,15 @@ function InventoryView({ inv, onAdjust }) {
           </table>
         </div>
       </div>
+
+      {editing && (
+        <ProductForm
+          product={editing === "new" ? null : editing}
+          cats={cats}
+          onClose={() => setEditing(null)}
+          onSave={(data) => { if (editing === "new") onAdd(data); else onEdit(editing.id, data); setEditing(null); }}
+        />
+      )}
     </>
   );
 }
@@ -660,6 +767,33 @@ export default function AdminDashboard() {
     setStock(id, ns).catch(console.error);
   };
 
+  // ---- إدارة المنتجات: تحديث متفائل + استدعاء API (مثل الأقسام) ----
+  // يبني حقول العرض المشتقّة (اسم القسم + اللون) من شجرة الأقسام المحمّلة.
+  const enrich = (data) => {
+    const c = cats.find((x) => x.id === data.categoryId);
+    const t1 = c ? (c.parentId == null ? c : cats.find((x) => x.id === c.parentId)) : null;
+    return { cat: t1?.name || "أخرى", accent: t1 ? (CAT_ACCENT[t1.name] || "#0C831F") : "#9AA8B5" };
+  };
+  const addProduct = (data) => {
+    const tmpId = "tmp" + Date.now();
+    setInv((a) => [{ id: tmpId, ...data, ...enrich(data), _pending: true }, ...a]);
+    createProduct(data)
+      .then((real) => setInv((a) => a.map((p) => (p.id === tmpId ? { ...real, _pending: false } : p))))
+      .catch((e) => { console.error(e); setInv((a) => a.filter((p) => p.id !== tmpId)); });
+  };
+  const editProduct = (id, data) => {
+    const prev = inv;
+    setInv((a) => a.map((p) => (p.id === id ? { ...p, ...data, ...enrich(data) } : p)));
+    updateProduct(id, data)
+      .then((real) => { if (real) setInv((a) => a.map((p) => (p.id === id ? { ...p, ...real } : p))); })
+      .catch((e) => { console.error(e); setInv(prev); });
+  };
+  const removeProduct = (id) => {
+    const prev = inv;
+    setInv((a) => a.filter((p) => p.id !== id));
+    deleteProduct(id).catch((e) => { console.error(e); setInv(prev); });
+  };
+
   const head = HEAD[active];
 
   return (
@@ -726,7 +860,7 @@ export default function AdminDashboard() {
             <>
               {active === "dash" && <OverviewView orders={orders} />}
               {active === "orders" && <OrdersView orders={orders} inv={inv} riders={riders} accept={accept} ready={ready} deliver={deliver} />}
-              {active === "inv" && <InventoryView inv={inv} onAdjust={onAdjust} />}
+              {active === "inv" && <InventoryView inv={inv} cats={cats} onAdjust={onAdjust} onAdd={addProduct} onEdit={editProduct} onDelete={removeProduct} />}
               {active === "cats" && <CategoriesView cats={cats} inv={inv} selT1={selT1} setSelT1={setSelT1} onAdd={addCat} onEdit={editCat} onDelete={removeCat} onMove={moveCat} />}
               {active === "cust" && <CustomersView customers={customers} />}
               {active === "analytics" && <AnalyticsView />}

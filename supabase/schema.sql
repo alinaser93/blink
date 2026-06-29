@@ -97,6 +97,12 @@ comment on column public.products.price_iqd is 'السعر بالدينار ال
 comment on column public.products.internal_supplier_name is 'اسم المورّد — للاستخدام الداخلي/الإداري فقط، لا يُعرض للزبائن';
 create index if not exists idx_products_category on public.products(category_id);
 
+-- سعر قبل الخصم (اختياري) لعرض الشطب وحساب نسبة الخصم. آمن لإعادة التشغيل.
+alter table public.products add column if not exists mrp_iqd integer;
+comment on column public.products.mrp_iqd is 'السعر قبل الخصم (د.ع) — اختياري؛ NULL/0 = لا خصم';
+-- ملاحظة: category_id قد يشير لقسم رئيسي أو لتفرّع (tier2) — هكذا يُربط المنتج بتفرّعه.
+-- وملاحظة: image_url يُعاد استخدامه لإيموجي المنتج بصيغة 'emoji:<e>' عند غياب صورة.
+
 
 -- =====================================================================
 --  4) ORDERS — الطلبات

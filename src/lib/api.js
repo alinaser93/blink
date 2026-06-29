@@ -25,6 +25,25 @@ let MOCK_CATEGORIES = [
   { id: "c8", name: "معلّبات",      parentId: "c1", iconName: null,      sort: 0 },
 ];
 
+// image_url يُعاد استخدامه لإيموجي المنتج بصيغة 'emoji:<e>'
+const parseEmoji = (s) => (typeof s === "string" && s.startsWith("emoji:")) ? s.slice(6) : null;
+
+// خريطة اسم القسم الرئيسي -> معرّفه (لربط المنتجات التجريبية بقسمها)
+const T1_ID = MOCK_CATEGORIES.reduce((m, c) => { if (c.parentId == null) m[c.name] = c.id; return m; }, {});
+
+// منتجات تجريبية قابلة للتعديل ضمن الجلسة، مربوطة بمعرّف قسم/تفرّع (categoryId)
+let MOCK_PRODUCTS_STORE = MOCK_PRODUCTS.map((p) => ({
+  id: p.id, name: p.name, price: p.price, stock: p.stock,
+  categoryId: T1_ID[p.cat] || null, weight: p.weight || "", mrp: p.mrp || 0, emoji: null, accent: p.accent || "#0C831F",
+}));
+
+// يحوّل صفّ منتج تجريبي إلى الشكل الموحّد (مع اسم القسم المباشر)
+const resolveMockProduct = (p) => {
+  const c = MOCK_CATEGORIES.find((x) => x.id === p.categoryId);
+  const cat = c ? c.name : "أخرى";
+  return { ...p, cat, Icon: ICON_MAP[CAT_ICON[cat]] || ICON_MAP.Package };
+};
+
 // عمود الكانبان  <->  حالة الطلب في قاعدة البيانات
 const STATUS2COL = { pending: "new", preparing: "packing", dispatched: "dispatched", delivered: "delivered" };
 const COL2STATUS = { new: "pending", packing: "preparing", dispatched: "dispatched", delivered: "delivered" };
@@ -41,21 +60,22 @@ const relAr = (iso) => {
 };
 const shortNum = (uuid) => "#" + String(uuid).replace(/-/g, "").slice(0, 4).toUpperCase();
 
+const PROD_COLS = "id,name,price_iqd,stock_quantity,mrp_iqd,category_id,weight_label,image_url,internal_supplier_name,categories(name)";
+const mapProduct = (r) => {
+  const cat = (r.categories && r.categories.name) || "أخرى";
+  return {
+    id: r.id, name: r.name, price: r.price_iqd, stock: r.stock_quantity,
+    mrp: r.mrp_iqd || 0, weight: r.weight_label || "", categoryId: r.category_id,
+    emoji: parseEmoji(r.image_url), cat, supplier: r.internal_supplier_name || "",
+    Icon: ICON_MAP[CAT_ICON[cat]] || ICON_MAP.Package, accent: CAT_ACCENT[cat] || "#0C831F",
+  };
+};
+
 export async function getProducts() {
-  if (!isLive) return MOCK_PRODUCTS;
-  const { data, error } = await supabase
-    .from("products")
-    .select("id,name,price_iqd,stock_quantity,category_id,internal_supplier_name,categories(name)")
-    .order("name");
+  if (!isLive) return MOCK_PRODUCTS_STORE.map(resolveMockProduct);
+  const { data, error } = await supabase.from("products").select(PROD_COLS).order("name");
   if (error) throw error;
-  return data.map((r) => {
-    const cat = (r.categories && r.categories.name) || "أخرى";
-    return {
-      id: r.id, name: r.name, cat, price: r.price_iqd, stock: r.stock_quantity,
-      supplier: r.internal_supplier_name || "", // داخلي فقط
-      Icon: ICON_MAP[CAT_ICON[cat]] || ICON_MAP.Package, accent: CAT_ACCENT[cat] || "#0C831F",
-    };
-  });
+  return data.map(mapProduct);
 }
 
 export async function getOrders() {
@@ -110,8 +130,57 @@ export async function setOrderStatus(id, col) {
 }
 
 export async function setStock(id, stock) {
-  if (!isLive) return;
+  if (!isLive) { const p = MOCK_PRODUCTS_STORE.find((x) => x.id === id); if (p) p.stock = stock; return; }
   const { error } = await supabase.from("products").update({ stock_quantity: stock }).eq("id", id);
+  if (error) throw error;
+}
+
+/* ============================ المنتجات (مربوطة بالقسم/التفرّع) ============================ */
+/*  categoryId = معرّف القسم الرئيسي أو التفرّع (tier2). الشكل الموحّد عبر mapProduct/resolveMockProduct */
+
+export async function createProduct({ name, categoryId = null, price = 0, stock = 0, weight = "", mrp = 0, emoji = null }) {
+  if (!isLive) {
+    const row = { id: "p" + Date.now(), name, categoryId: categoryId ?? null, price: +price || 0, stock: +stock || 0, weight: weight || "", mrp: +mrp || 0, emoji: emoji || null, accent: "#0C831F" };
+    MOCK_PRODUCTS_STORE.push(row);
+    return resolveMockProduct(row);
+  }
+  const { data, error } = await supabase.from("products").insert({
+    name, category_id: categoryId ?? null, price_iqd: +price || 0, stock_quantity: +stock || 0,
+    weight_label: weight || null, mrp_iqd: +mrp || 0, image_url: emoji ? "emoji:" + emoji : null,
+  }).select(PROD_COLS).single();
+  if (error) throw error;
+  return mapProduct(data);
+}
+
+export async function updateProduct(id, { name, categoryId, price, stock, weight, mrp, emoji }) {
+  if (!isLive) {
+    const p = MOCK_PRODUCTS_STORE.find((x) => x.id === id);
+    if (p) {
+      if (name !== undefined) p.name = name;
+      if (categoryId !== undefined) p.categoryId = categoryId ?? null;
+      if (price !== undefined) p.price = +price || 0;
+      if (stock !== undefined) p.stock = +stock || 0;
+      if (weight !== undefined) p.weight = weight;
+      if (mrp !== undefined) p.mrp = +mrp || 0;
+      if (emoji !== undefined) p.emoji = emoji || null;
+    }
+    return;
+  }
+  const patch = {};
+  if (name !== undefined) patch.name = name;
+  if (categoryId !== undefined) patch.category_id = categoryId ?? null;
+  if (price !== undefined) patch.price_iqd = +price || 0;
+  if (stock !== undefined) patch.stock_quantity = +stock || 0;
+  if (weight !== undefined) patch.weight_label = weight || null;
+  if (mrp !== undefined) patch.mrp_iqd = +mrp || 0;
+  if (emoji !== undefined) patch.image_url = emoji ? "emoji:" + emoji : null;
+  const { error } = await supabase.from("products").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteProduct(id) {
+  if (!isLive) { MOCK_PRODUCTS_STORE = MOCK_PRODUCTS_STORE.filter((x) => x.id !== id); return; }
+  const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) throw error;
 }
 
