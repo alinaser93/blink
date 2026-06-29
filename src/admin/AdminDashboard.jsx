@@ -2,13 +2,15 @@ import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard, Activity, Boxes, Users, BarChart3, Wallet, Clock, AlertTriangle,
   Bike, Bell, Search, Plus, Pencil, Package, CheckCircle2, Settings, Store,
-  TrendingUp, ShoppingCart, UserPlus, ArrowUpRight, Minus,
-  Apple, Milk, CupSoda, Popcorn, Egg, Wheat, Droplet, GlassWater, Carrot, Coffee,
+  TrendingUp, ShoppingCart, UserPlus, ArrowUpRight, Minus, Loader2,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
+import {
+  getProducts, getOrders, getCustomers, getRiders, setOrderStatus, setStock, isLive,
+} from "../lib/api.js";
 
 /* ================================================================== */
 /*  Styles                                                            */
@@ -49,12 +51,14 @@ const STYLE = `
 .toggle-knob { box-shadow:0 1px 3px rgba(16,24,40,.3); }
 .pulse-dot { animation:pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(225,29,42,.5);} 50%{ box-shadow:0 0 0 7px rgba(225,29,42,0);} }
+.spin { animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
 .brand-grad { background:linear-gradient(135deg,#0C831F 0%, #0A6A19 100%); }
 .gold-grad { background:linear-gradient(135deg,#E7C66B 0%, #D4AF37 100%); }
 `;
 
 /* ================================================================== */
-/*  Data                                                              */
+/*  Static config + chart data                                        */
 /* ================================================================== */
 const NAV = [
   { id: "dash", label: "الرئيسية", Icon: LayoutDashboard },
@@ -75,40 +79,7 @@ const COLS = {
   packing: { title: "قيد التجهيز", accent: "#D4AF37", tint: "#FBF3DA" },
   dispatched: { title: "مع المندوب", accent: "#0C831F", tint: "#EAF6EC" },
 };
-const ORDERS_INIT = [
-  { id: 1046, col: "new", time: "الآن", items: 8, total: 21000 },
-  { id: 1045, col: "new", time: "منذ دقيقة", items: 3, total: 7000 },
-  { id: 1042, col: "new", time: "منذ دقيقتين", items: 5, total: 12500 },
-  { id: 1041, col: "packing", items: 4, total: 9500 },
-  { id: 1040, col: "packing", items: 8, total: 18000 },
-  { id: 1038, col: "dispatched", items: 6, total: 14000, rider: "أحمد", status: "في الطريق" },
-  { id: 1037, col: "dispatched", items: 2, total: 5000, rider: "سجاد", status: "قرب الوصول" },
-];
-const RIDERS = ["مصطفى", "حيدر", "علي", "كرار", "حسن"];
-const INV_INIT = [
-  { id: "p1", name: "موز عضوي", cat: "خضار وفواكه", price: 2000, stock: 48, Icon: Apple, accent: "#D9A521" },
-  { id: "p2", name: "حليب طازج كامل الدسم", cat: "ألبان", price: 1500, stock: 6, Icon: Milk, accent: "#2B7A9B" },
-  { id: "p3", name: "بيبسي ٣٣٠ مل", cat: "مشروبات", price: 750, stock: 0, Icon: CupSoda, accent: "#23306E" },
-  { id: "p4", name: "شيبس بنكهة الملح", cat: "سناكس", price: 1000, stock: 120, Icon: Popcorn, accent: "#E0A21F" },
-  { id: "p5", name: "بيض طازج (٣٠ حبة)", cat: "ألبان", price: 4500, stock: 3, Icon: Egg, accent: "#C9923E" },
-  { id: "p6", name: "رز بسمتي ٥ كغم", cat: "بقالة", price: 12000, stock: 25, Icon: Wheat, accent: "#9A6B2E" },
-  { id: "p7", name: "زيت دوّار الشمس ١ لتر", cat: "بقالة", price: 3500, stock: 40, Icon: Droplet, accent: "#D9A521" },
-  { id: "p8", name: "ماء معدني ١.٥ لتر", cat: "مشروبات", price: 500, stock: 0, Icon: GlassWater, accent: "#2B7A9B" },
-  { id: "p9", name: "طماطم طازجة", cat: "خضار وفواكه", price: 1250, stock: 64, Icon: Carrot, accent: "#D33A3A" },
-  { id: "p10", name: "جبنة شيدر مبشورة", cat: "ألبان", price: 6000, stock: 9, Icon: Milk, accent: "#D9A521" },
-  { id: "p11", name: "تمر مجدول فاخر", cat: "بقالة", price: 8000, stock: 30, Icon: Wheat, accent: "#9A6B2E" },
-  { id: "p12", name: "عصير برتقال طازج", cat: "مشروبات", price: 2000, stock: 18, Icon: Coffee, accent: "#E0852E" },
-];
 const INV_CATS = ["الكل", "بقالة", "خضار وفواكه", "مشروبات", "ألبان", "سناكس"];
-const CUSTOMERS = [
-  { name: "علي حسن", phone: "0770 123 4567", orders: 24, spent: 312000, last: "اليوم", status: "نشط" },
-  { name: "زينب كريم", phone: "0771 234 5678", orders: 8, spent: 96000, last: "أمس", status: "نشط" },
-  { name: "مصطفى علاء", phone: "0780 345 6789", orders: 1, spent: 12500, last: "اليوم", status: "جديد" },
-  { name: "حيدر قاسم", phone: "0750 456 7890", orders: 15, spent: 188000, last: "قبل ٣ أيام", status: "نشط" },
-  { name: "فاطمة جواد", phone: "0772 567 8901", orders: 3, spent: 41000, last: "قبل أسبوع", status: "غير نشط" },
-  { name: "كرار عبد", phone: "0781 678 9012", orders: 32, spent: 540000, last: "اليوم", status: "نشط" },
-  { name: "سجى نور", phone: "0773 789 0123", orders: 2, spent: 23000, last: "قبل يومين", status: "جديد" },
-];
 const REV_7D = [
   { d: "السبت", v: 620000 }, { d: "الأحد", v: 540000 }, { d: "الإثنين", v: 710000 },
   { d: "الثلاثاء", v: 680000 }, { d: "الأربعاء", v: 790000 }, { d: "الخميس", v: 850000 }, { d: "الجمعة", v: 920000 },
@@ -128,8 +99,6 @@ const TOP_PRODUCTS = [
 const iqd = (n) => Number(n).toLocaleString("en-US") + " د.ع";
 const kFmt = (n) => Math.round(n / 1000) + "k";
 const pad = (n) => String(n).padStart(2, "0");
-const AR_DAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-const AR_MONTHS = ["كانون الثاني", "شباط", "آذار", "نيسان", "أيار", "حزيران", "تموز", "آب", "أيلول", "تشرين الأول", "تشرين الثاني", "كانون الأول"];
 const stockBadge = (n) => n === 0 ? { t: "نفد", c: "#E11D2A", bg: "#FDECEC" } : n < 10 ? { t: "منخفض", c: "#D98A1F", bg: "#FEF3E2" } : { t: "متوفّر", c: "#0C831F", bg: "#EAF6EC" };
 const custBadge = (s) => s === "نشط" ? { c: "#0C831F", bg: "#EAF6EC" } : s === "جديد" ? { c: "#2563EB", bg: "#E8F0FE" } : { c: "#7A8493", bg: "#F1F3F6" };
 
@@ -146,7 +115,6 @@ function LiveClock() {
     </div>
   );
 }
-
 function Metric({ label, num, unit, Icon, tint, color, sub, subColor, pulse }) {
   return (
     <div className="metric rounded-2xl p-5">
@@ -163,24 +131,16 @@ function Metric({ label, num, unit, Icon, tint, color, sub, subColor, pulse }) {
     </div>
   );
 }
-
-function ChartCard({ title, sub, children, action }) {
+function ChartCard({ title, sub, children }) {
   return (
     <div className="panel rounded-2xl p-5">
-      <div className="flex items-start justify-between mb-4">
-        <div><h3 className="text-base font-extrabold">{title}</h3>{sub && <p className="text-xs mt-0.5" style={{ color: "#9AA3AF" }}>{sub}</p>}</div>
-        {action}
-      </div>
+      <div className="mb-4"><h3 className="text-base font-extrabold">{title}</h3>{sub && <p className="text-xs mt-0.5" style={{ color: "#9AA3AF" }}>{sub}</p>}</div>
       {children}
     </div>
   );
 }
-
 const tipStyle = { background: "#fff", border: "1px solid #EEF0F2", borderRadius: 12, fontFamily: "Cairo", fontSize: 12, boxShadow: "0 8px 24px rgba(16,24,40,.12)" };
 
-/* ================================================================== */
-/*  Views                                                             */
-/* ================================================================== */
 function RevenueChart() {
   return (
     <ResponsiveContainer width="100%" height={250}>
@@ -196,6 +156,9 @@ function RevenueChart() {
   );
 }
 
+/* ================================================================== */
+/*  Views                                                             */
+/* ================================================================== */
 function OverviewView({ orders }) {
   const recent = orders.slice(0, 5);
   return (
@@ -211,6 +174,7 @@ function OverviewView({ orders }) {
         <div className="panel rounded-2xl p-5">
           <h3 className="text-base font-extrabold mb-3">أحدث الطلبات</h3>
           <div className="flex flex-col gap-3">
+            {recent.length === 0 && <p className="text-sm" style={{ color: "#AEB6BF" }}>لا توجد طلبات حالياً</p>}
             {recent.map((o) => (
               <div key={o.id} className="flex items-center gap-3">
                 <span className="rounded-lg flex items-center justify-center shrink-0" style={{ width: 38, height: 38, background: COLS[o.col].tint }}><Package size={17} style={{ color: COLS[o.col].accent }} /></span>
@@ -225,7 +189,7 @@ function OverviewView({ orders }) {
   );
 }
 
-function OrdersView({ orders, inv, accept, ready, deliver }) {
+function OrdersView({ orders, inv, riders, accept, ready, deliver }) {
   const byCol = (c) => orders.filter((o) => o.col === c);
   const pending = byCol("new").length + byCol("packing").length;
   const oos = inv.filter((p) => p.stock === 0).length;
@@ -235,7 +199,7 @@ function OrdersView({ orders, inv, accept, ready, deliver }) {
         <Metric label="مبيعات اليوم" num="850,000" unit="د.ع" Icon={Wallet} tint="#FBF3DA" color="#B8932E" sub="▲ 12% عن أمس" subColor="#0C831F" />
         <Metric label="طلبات قيد الانتظار" num={String(pending)} Icon={Clock} tint="#FDECEC" color="#E11D2A" sub="تحتاج إجراء فوري" subColor="#E11D2A" pulse />
         <Metric label="مواد نفدت" num={String(oos)} Icon={AlertTriangle} tint="#FEF3E2" color="#D98A1F" sub="راجع المخزون" subColor="#D98A1F" />
-        <Metric label="مناديب متاحين" num="5" Icon={Bike} tint="#EAF6EC" color="#0C831F" sub="جاهزين للتوصيل" subColor="#0C831F" />
+        <Metric label="مناديب متاحين" num={String(riders.length)} Icon={Bike} tint="#EAF6EC" color="#0C831F" sub="جاهزين للتوصيل" subColor="#0C831F" />
       </div>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-extrabold flex items-center gap-2"><Activity size={20} style={{ color: "#0C831F" }} /> لوحة الطلبات الحية</h2>
@@ -262,7 +226,7 @@ function OrdersView({ orders, inv, accept, ready, deliver }) {
                     </div>
                     {cid === "dispatched" ? (
                       <div className="flex items-center gap-2 mt-3">
-                        <span className="rounded-full flex items-center justify-center shrink-0" style={{ width: 30, height: 30, background: "#EAF6EC", color: "#0C831F", fontWeight: 800, fontSize: 13 }}>{o.rider.slice(0, 1)}</span>
+                        <span className="rounded-full flex items-center justify-center shrink-0" style={{ width: 30, height: 30, background: "#EAF6EC", color: "#0C831F", fontWeight: 800, fontSize: 13 }}>{(o.rider || "?").slice(0, 1)}</span>
                         <div className="flex-1 min-w-0"><p className="text-sm font-bold leading-none">{o.rider}</p><p className="text-xs mt-1" style={{ color: "#9AA3AF" }}>{o.items} مواد · {iqd(o.total)}</p></div>
                         <Bike size={18} style={{ color: "#0C831F" }} />
                       </div>
@@ -286,14 +250,12 @@ function OrdersView({ orders, inv, accept, ready, deliver }) {
   );
 }
 
-function InventoryView({ inv, setInv }) {
+function InventoryView({ inv, onAdjust }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("الكل");
-  const adjust = (id, d) => setInv((a) => a.map((p) => p.id === id ? { ...p, stock: Math.max(0, p.stock + d) } : p));
   const rows = inv.filter((p) => (cat === "الكل" || p.cat === cat) && p.name.includes(q));
   const oos = inv.filter((p) => p.stock === 0).length;
   const low = inv.filter((p) => p.stock > 0 && p.stock < 10).length;
-
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -301,7 +263,6 @@ function InventoryView({ inv, setInv }) {
         <Metric label="مواد منخفضة" num={String(low)} Icon={AlertTriangle} tint="#FEF3E2" color="#D98A1F" sub="أقل من ١٠ وحدات" subColor="#D98A1F" />
         <Metric label="مواد نفدت" num={String(oos)} Icon={Package} tint="#FDECEC" color="#E11D2A" sub="تحتاج تزويد" subColor="#E11D2A" pulse={oos > 0} />
       </div>
-
       <div className="panel rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between gap-3 p-5 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
@@ -314,7 +275,6 @@ function InventoryView({ inv, setInv }) {
             <button className="btn-green rounded-lg flex items-center gap-2 text-sm font-extrabold" style={{ padding: "9px 16px" }}><Plus size={17} /> إضافة منتج</button>
           </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
@@ -334,8 +294,8 @@ function InventoryView({ inv, setInv }) {
                     <td className="px-5 py-3"><div className="flex items-center gap-2"><span className="rounded-full" style={{ width: 8, height: 8, background: b.c }} /><span className="text-sm font-bold tabular-nums">{p.stock}</span><span className="text-xs font-extrabold rounded-full px-2 py-0.5" style={{ background: b.bg, color: b.c }}>{b.t}</span></div></td>
                     <td className="px-5 py-3">
                       <div className="inline-flex items-center gap-2">
-                        <button onClick={() => adjust(p.id, -1)} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#5A6473" }}><Minus size={15} strokeWidth={2.6} /></button>
-                        <button onClick={() => adjust(p.id, 1)} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#0C831F" }}><Plus size={15} strokeWidth={2.6} /></button>
+                        <button onClick={() => onAdjust(p.id, -1)} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#5A6473" }}><Minus size={15} strokeWidth={2.6} /></button>
+                        <button onClick={() => onAdjust(p.id, 1)} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#0C831F" }}><Plus size={15} strokeWidth={2.6} /></button>
                       </div>
                     </td>
                     <td className="px-5 py-3"><button className="btn-ghost rounded-lg flex items-center gap-1.5 text-sm font-bold" style={{ padding: "7px 14px" }}><Pencil size={14} /> تعديل</button></td>
@@ -350,8 +310,7 @@ function InventoryView({ inv, setInv }) {
   );
 }
 
-function CustomersView() {
-  const total = CUSTOMERS.length;
+function CustomersView({ customers }) {
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -361,14 +320,14 @@ function CustomersView() {
       </div>
       <div className="panel rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between gap-3 p-5">
-          <div><h2 className="text-lg font-extrabold">قائمة العملاء</h2><p className="text-sm mt-0.5" style={{ color: "#7A8493" }}>عرض {total} من أبرز العملاء</p></div>
+          <div><h2 className="text-lg font-extrabold">قائمة العملاء</h2><p className="text-sm mt-0.5" style={{ color: "#7A8493" }}>عرض {customers.length} من أبرز العملاء</p></div>
           <div className="rounded-lg flex items-center gap-2 px-3" style={{ border: "1px solid #E6E9EE", height: 40 }}><Search size={16} style={{ color: "#9AA3AF" }} /><input placeholder="بحث..." className="bg-transparent outline-none text-sm" style={{ width: 120 }} /></div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 720 }}>
             <thead><tr style={{ background: "#F7F8FA" }}>{["العميل", "الهاتف", "الطلبات", "إجمالي الإنفاق", "آخر طلب", "الحالة"].map((h) => <th key={h} className="text-xs font-extrabold px-5 py-3" style={{ color: "#7A8493", textAlign: "right", whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
             <tbody>
-              {CUSTOMERS.map((c) => {
+              {customers.map((c) => {
                 const b = custBadge(c.status);
                 return (
                   <tr key={c.phone} className="tbl-row" style={{ borderTop: "1px solid #F2F3F5" }}>
@@ -398,9 +357,7 @@ function AnalyticsView() {
         <Metric label="متوسط قيمة الطلب" num="14,200" unit="د.ع" Icon={TrendingUp} tint="#EAF6EC" color="#0C831F" sub="▲ 3%" subColor="#0C831F" />
         <Metric label="معدّل النمو" num="14%" Icon={ArrowUpRight} tint="#F3EEF9" color="#7A5AB8" sub="مقارنة شهرية" subColor="#7A5AB8" />
       </div>
-
       <div className="mb-4"><ChartCard title="اتجاه المبيعات — آخر ٧ أيام" sub="بالدينار العراقي"><RevenueChart /></ChartCard></div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <ChartCard title="الطلبات حسب الساعة" sub="توزيع الطلبات خلال اليوم">
           <ResponsiveContainer width="100%" height={240}>
@@ -413,7 +370,6 @@ function AnalyticsView() {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-
         <ChartCard title="المبيعات حسب القسم" sub="نسبة كل قسم من المبيعات">
           <div className="flex items-center gap-4 flex-wrap">
             <ResponsiveContainer width={200} height={200}>
@@ -436,7 +392,6 @@ function AnalyticsView() {
           </div>
         </ChartCard>
       </div>
-
       <ChartCard title="أكثر المنتجات مبيعاً" sub="حسب عدد الطلبات هذا الأسبوع">
         <div className="flex flex-col gap-4">
           {TOP_PRODUCTS.map((p, i) => (
@@ -454,25 +409,64 @@ function AnalyticsView() {
   );
 }
 
+function Loading() {
+  return (
+    <div className="flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
+      <Loader2 size={40} className="spin" style={{ color: "#0C831F" }} />
+      <p className="text-sm font-bold mt-3" style={{ color: "#9AA3AF" }}>جاري تحميل البيانات...</p>
+    </div>
+  );
+}
+
 /* ================================================================== */
 /*  Root                                                              */
 /* ================================================================== */
 export default function AdminDashboard() {
   const [active, setActive] = useState("orders");
   const [open, setOpen] = useState(true);
-  const [orders, setOrders] = useState(ORDERS_INIT);
-  const [inv, setInv] = useState(INV_INIT);
+  const [orders, setOrders] = useState([]);
+  const [inv, setInv] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [riders, setRiders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const accept = (id) => setOrders((a) => a.map((o) => o.id === id ? { ...o, col: "packing" } : o));
-  const ready = (id) => setOrders((a) => a.map((o) => o.id === id ? { ...o, col: "dispatched", rider: RIDERS[Math.floor(Math.random() * RIDERS.length)], status: "في الطريق" } : o));
-  const deliver = (id) => setOrders((a) => a.filter((o) => o.id !== id));
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [p, o, c, r] = await Promise.all([getProducts(), getOrders(), getCustomers(), getRiders()]);
+        if (!alive) return;
+        setInv(p); setOrders(o); setCustomers(c); setRiders(r);
+      } catch (e) {
+        console.error("فشل تحميل البيانات من Supabase:", e);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const accept = (id) => { setOrders((a) => a.map((o) => o.id === id ? { ...o, col: "packing" } : o)); setOrderStatus(id, "packing").catch(console.error); };
+  const ready = (id) => {
+    const rider = riders.length ? riders[Math.floor(Math.random() * riders.length)] : "مندوب";
+    setOrders((a) => a.map((o) => o.id === id ? { ...o, col: "dispatched", rider, status: "في الطريق" } : o));
+    setOrderStatus(id, "dispatched", rider, "في الطريق").catch(console.error);
+  };
+  const deliver = (id) => { setOrders((a) => a.filter((o) => o.id !== id)); setOrderStatus(id, "delivered").catch(console.error); };
+  const onAdjust = (id, d) => {
+    const prod = inv.find((p) => p.id === id);
+    if (!prod) return;
+    const ns = Math.max(0, prod.stock + d);
+    setInv((a) => a.map((p) => p.id === id ? { ...p, stock: ns } : p));
+    setStock(id, ns).catch(console.error);
+  };
+
   const head = HEAD[active];
 
   return (
     <div className="admin min-h-screen flex" dir="rtl" lang="ar">
       <style>{STYLE}</style>
 
-      {/* SIDEBAR */}
       <aside className="side shrink-0 flex flex-col no-scrollbar" style={{ width: 266, position: "sticky", top: 0, height: "100vh", alignSelf: "flex-start", overflowY: "auto" }}>
         <div className="flex items-center gap-3 px-5" style={{ height: 76 }}>
           <div className="brand-grad rounded-xl flex items-center justify-center shrink-0" style={{ width: 42, height: 42, boxShadow: "0 6px 16px rgba(12,131,31,.3)" }}><Store size={22} color="#fff" /></div>
@@ -501,7 +495,6 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* MAIN */}
       <main className="flex-1 min-w-0">
         <header className="sticky top-0 z-20" style={{ background: "rgba(250,250,250,.85)", backdropFilter: "blur(8px)", borderBottom: "1px solid #EEF0F2" }}>
           <div className="flex items-center justify-between gap-4 px-6 py-4 flex-wrap">
@@ -510,6 +503,10 @@ export default function AdminDashboard() {
               <p className="text-sm mt-1" style={{ color: "#7A8493" }}>{head.s}</p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="panel rounded-xl flex items-center gap-2 px-3 py-2.5">
+                <span className="rounded-full" style={{ width: 8, height: 8, background: isLive ? "#0C831F" : "#D4AF37" }} />
+                <span className="text-xs font-extrabold" style={{ color: isLive ? "#0C831F" : "#B8932E" }}>{isLive ? "متصل بقاعدة البيانات" : "بيانات تجريبية"}</span>
+              </div>
               <LiveClock />
               <button onClick={() => setOpen((o) => !o)} className="panel rounded-xl flex items-center gap-2.5 px-3 py-2.5">
                 <span className="toggle-track rounded-full" style={{ width: 44, height: 25, background: open ? "#0C831F" : "#C7CDD6", padding: 3, justifyContent: open ? "flex-start" : "flex-end" }}><span className="toggle-knob block rounded-full" style={{ width: 19, height: 19, background: "#fff" }} /></span>
@@ -522,11 +519,15 @@ export default function AdminDashboard() {
         </header>
 
         <div className="p-6" style={{ maxWidth: 1480, margin: "0 auto" }}>
-          {active === "dash" && <OverviewView orders={orders} />}
-          {active === "orders" && <OrdersView orders={orders} inv={inv} accept={accept} ready={ready} deliver={deliver} />}
-          {active === "inv" && <InventoryView inv={inv} setInv={setInv} />}
-          {active === "cust" && <CustomersView />}
-          {active === "analytics" && <AnalyticsView />}
+          {loading ? <Loading /> : (
+            <>
+              {active === "dash" && <OverviewView orders={orders} />}
+              {active === "orders" && <OrdersView orders={orders} inv={inv} riders={riders} accept={accept} ready={ready} deliver={deliver} />}
+              {active === "inv" && <InventoryView inv={inv} onAdjust={onAdjust} />}
+              {active === "cust" && <CustomersView customers={customers} />}
+              {active === "analytics" && <AnalyticsView />}
+            </>
+          )}
           <p className="text-center text-xs mt-8" style={{ color: "#C7CDD6" }}>منصة سلّـة · لوحة التاجر · فرع السماوة</p>
         </div>
       </main>
