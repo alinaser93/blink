@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "./cart.jsx";
+import { emojiFor } from "./emoji.js";
 import {
   ArrowRight, Search, Share2, ChevronDown, ChevronLeft, SlidersHorizontal, ArrowUpDown,
   ShoppingBasket, Carrot, Apple, Grape, Leaf, Salad, Sprout, Flower2, Cherry, Snowflake,
@@ -97,8 +98,8 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <div className="flex flex-col">
-      <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: "#F3F5F8", overflow: "hidden" }}>
-        <div className="absolute inset-0 flex items-center justify-center"><p.Icon size={52} style={{ color: p.accent || "#9AA8B5", opacity: 0.28 }} /></div>
+      <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: (p.accent || "#9AA8B5") + "16", overflow: "hidden" }}>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 56 }}>{emojiFor(p.name)}</div>
         {p.badge && <span className="absolute text-xs font-extrabold" style={{ top: 8, insetInlineStart: 0, background: p.badge.c, color: "#fff", padding: "3px 9px", borderStartEndRadius: 8, borderEndEndRadius: 8 }}>{p.badge.t}</span>}
         <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 8, insetInlineEnd: 8, width: 26, height: 26, background: "#fff" }}><Heart size={14} style={{ color: "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ bottom: 44, insetInlineEnd: 8, width: 17, height: 17, borderRadius: 3, border: "1.5px solid #1A7A33", background: "#fff" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#1A7A33" }} /></span>

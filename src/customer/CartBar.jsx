@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "./cart.jsx";
+import { emojiFor } from "./emoji.js";
 import { ShoppingCart, ChevronLeft, Bike, Package, Check } from "lucide-react";
 
 /* ================================================================== */
@@ -64,14 +65,11 @@ export default function CartBar() {
           <button onClick={() => nav("/cart")} className="cartbar-go w-full flex items-center justify-between gap-2" style={{ background: "#0C831F", color: "#fff", padding: "10px 14px" }}>
             <span className="flex items-center gap-2.5 min-w-0">
               <span className="flex items-center" style={{ paddingInlineStart: thumbs.length > 1 ? 8 : 0 }}>
-                {thumbs.map((it, i) => {
-                  const Ic = it.Icon || Package;
-                  return (
-                    <span key={it.id} className="rounded-lg flex items-center justify-center" style={{ width: 32, height: 32, background: "#fff", border: "2px solid #0C831F", marginInlineStart: i ? -10 : 0, zIndex: thumbs.length - i }}>
-                      <Ic size={17} style={{ color: it.accent || "#0C831F" }} />
-                    </span>
-                  );
-                })}
+                {thumbs.map((it, i) => (
+                  <span key={it.id} className="rounded-lg flex items-center justify-center" style={{ width: 32, height: 32, background: "#fff", border: "2px solid #0C831F", marginInlineStart: i ? -10 : 0, zIndex: thumbs.length - i, fontSize: 17 }}>
+                    {emojiFor(it.name)}
+                  </span>
+                ))}
               </span>
               <span className="flex flex-col items-start leading-none min-w-0">
                 <span className="text-sm font-extrabold">{count} {unit}</span>

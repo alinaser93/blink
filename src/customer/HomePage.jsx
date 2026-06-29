@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "./cart.jsx";
+import { emojiFor } from "./emoji.js";
 import {
   MapPin, ChevronDown, ChevronLeft, Wallet, User, Search, Mic, X, Clock,
   Bike, Home, Printer, LayoutGrid, ShoppingBag, ShoppingCart, Umbrella, Headphones, Sparkles, Lamp,
@@ -93,9 +94,12 @@ const TABS = [
 /*  ALL tab data                                                      */
 /* ================================================================== */
 const BESTSELLERS = [
-  { name: "شيبس وتسالي", count: "+313" }, { name: "مشروبات وعصائر", count: "+208" },
-  { name: "آيس كريم والمزيد", count: "+88" }, { name: "خضار وفواكه", count: "+137" },
-  { name: "ألبان وخبز وبيض", count: "+28" }, { name: "حلويات وشوكولاتة", count: "+240" },
+  { name: "شيبس وتسالي", count: "+313", e: ["🍟", "🍿", "🥨", "🧀"] },
+  { name: "مشروبات وعصائر", count: "+208", e: ["🥤", "🧃", "💧", "🧉"] },
+  { name: "آيس كريم والمزيد", count: "+88", e: ["🍦", "🍨", "🍧", "🍡"] },
+  { name: "خضار وفواكه", count: "+137", e: ["🍅", "🥬", "🍌", "🥕"] },
+  { name: "ألبان وخبز وبيض", count: "+28", e: ["🥛", "🧀", "🥚", "🥖"] },
+  { name: "حلويات وشوكولاتة", count: "+240", e: ["🍫", "🍬", "🍪", "🍩"] },
 ];
 const ICON_COLORS = ["#2B7A9B", "#B8860B", "#C2477F", "#0C831F", "#7A5AB8", "#C9692E", "#1F9B8A", "#C24747"];
 const SECTIONS = [
@@ -301,8 +305,8 @@ function ProductCard({ p, accent, Icon, qty, onAdd, onInc, onDec }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <div className="flex flex-col">
-      <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: "#F5F7F9", overflow: "hidden" }}>
-        <div className="absolute inset-0 flex items-center justify-center"><Icon size={44} style={{ color: accent, opacity: 0.26 }} /></div>
+      <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: (accent || "#9AA8B5") + "16", overflow: "hidden" }}>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 52 }}>{emojiFor(p.name)}</div>
         <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineStart: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} style={{ color: "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 16, height: 16, borderRadius: 3, border: "1.5px solid " + (p.nonveg ? "#B23B3B" : "#1A7A33"), background: "#fff" }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: p.nonveg ? "#B23B3B" : "#1A7A33" }} />
@@ -557,7 +561,7 @@ export default function HomePage() {
               {BESTSELLERS.map((cd) => (
                 <button key={cd.name} className="best-card rounded-2xl p-2">
                   <div className="grid grid-cols-2 gap-1">
-                    {[0, 1, 2, 3].map((i) => (<div key={i} className="img-box aspect-square rounded-md overflow-hidden"><img src={BEST_IMG} alt="" loading="lazy" className="w-full h-full object-cover" onError={onImgErr} /></div>))}
+                    {[0, 1, 2, 3].map((i) => (<div key={i} className="img-box aspect-square rounded-md flex items-center justify-center" style={{ fontSize: 24 }}>{cd.e[i]}</div>))}
                   </div>
                   <span className="best-pill inline-block mt-2 text-xs font-bold rounded-full px-2 py-0.5">{cd.count} منتج</span>
                   <p className="text-xs font-extrabold mt-1 leading-tight" style={{ color: "#1A1A1A" }}>{cd.name}</p>
@@ -572,7 +576,7 @@ export default function HomePage() {
               <div className="grid grid-cols-4 lg:grid-cols-8 gap-2.5">
                 {sec.items.map((item, i) => (
                   <button key={item.name} className="cat-tile rounded-2xl p-1.5 flex flex-col items-center" style={{ background: "#F0F8FA" }}>
-                    <div className="w-full aspect-square flex items-center justify-center"><item.Icon size={32} strokeWidth={1.7} style={{ color: ICON_COLORS[i % ICON_COLORS.length] }} /></div>
+                    <div className="w-full aspect-square flex items-center justify-center" style={{ fontSize: 30 }}>{emojiFor(item.name)}</div>
                     <span className="text-xs font-semibold text-center leading-tight mt-0.5 mb-1" style={{ color: "#2A2F36", minHeight: "2.4em" }}>{item.name}</span>
                   </button>
                 ))}

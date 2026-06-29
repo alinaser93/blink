@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "./cart.jsx";
+import { emojiFor } from "./emoji.js";
 import {
   ArrowRight, Search, Share2, ChevronLeft, Heart, Plus, Minus,
   Mic, PhoneOff, BellOff, Gift, CreditCard, Wallet, Banknote, Star, Clock,
@@ -92,8 +93,8 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <div className="flex flex-col">
-      <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: "#F3F5F8", overflow: "hidden" }}>
-        <div className="absolute inset-0 flex items-center justify-center"><p.Icon size={44} style={{ color: p.accent || "#9AA8B5", opacity: 0.28 }} /></div>
+      <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: (p.accent || "#9AA8B5") + "16", overflow: "hidden" }}>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 46 }}>{emojiFor(p.name)}</div>
         <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} style={{ color: "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ bottom: 42, insetInlineEnd: 8, width: 16, height: 16, borderRadius: 3, border: "1.5px solid #1A7A33", background: "#fff" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#1A7A33" }} /></span>
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between" style={{ padding: 6 }}>
@@ -325,7 +326,7 @@ export default function CartPage() {
         <div className="card mt-2 mx-3 rounded-2xl px-3">
           {items.map((it, i) => (
             <div key={it.id} className="flex items-start gap-3 py-3" style={{ borderTop: i ? "1px solid #F2F3F5" : "none" }}>
-              <div className="rounded-xl flex items-center justify-center shrink-0" style={{ width: 64, height: 64, background: "#F3F5F8" }}><it.Icon size={30} style={{ color: it.accent, opacity: 0.5 }} /></div>
+              <div className="rounded-xl flex items-center justify-center shrink-0" style={{ width: 64, height: 64, background: (it.accent || "#9AA8B5") + "16", fontSize: 32 }}>{emojiFor(it.name)}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold leading-tight" style={{ color: "#1A1A1A" }}>{it.name}</p>
                 <p className="text-xs mt-0.5" style={{ color: "#7A8493" }}>{it.weight}</p>
