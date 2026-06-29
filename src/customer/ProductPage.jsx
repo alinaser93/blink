@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "./cart.jsx";
 import {
   ChevronDown, ChevronLeft, Heart, Search, Share2, Plus, Minus, Clock, Bike, X, RefreshCcw,
   Citrus, Carrot, Leaf, Apple, Cherry, Salad, Sprout,
@@ -122,7 +124,7 @@ const Feed3 = ({ title, items, c }) => (
   <section className="px-3 pt-6">
     <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>{title}</h2>
     <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-2.5 gap-y-5">
-      {items.map((p) => <ProductCard key={p.id} p={p} qty={c.cart[p.id] || 0} onAdd={() => c.add(p.id)} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} />)}
+      {items.map((p) => <ProductCard key={p.id} p={p} qty={c.qty(p.id)} onAdd={() => c.add(p)} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} />)}
     </div>
   </section>
 );
@@ -132,8 +134,9 @@ const Feed3 = ({ title, items, c }) => (
 /* ================================================================== */
 export default function ProductPage() {
   const [bannerOpen, setBannerOpen] = useState(true);
-  const [cart, setCart] = useState({});
   const [gal, setGal] = useState(0);
+  const nav = useNavigate();
+  const { qty, add, inc, dec, subtotal } = useCart();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(120);
@@ -144,13 +147,9 @@ export default function ProductPage() {
     return () => window.removeEventListener("resize", measure);
   }, [bannerOpen]);
 
-  const subtotal = Object.entries(cart).reduce((s, [id, q]) => { const p = [MAIN, ...FEED].find((x) => x.id === +id); return s + (p ? p.price * q : 0); }, 0);
   const remaining = Math.max(0, FREE_AT - subtotal);
-  const add = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const inc = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const dec = (id) => setCart((m) => { const q = (m[id] || 0) - 1; const n = { ...m }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
-  const c = { cart, add, inc, dec };
-  const mainQty = cart[MAIN.id] || 0;
+  const c = { qty, add, inc, dec };
+  const mainQty = qty(MAIN.id);
   const off = Math.round((1 - MAIN.price / MAIN.mrp) * 100);
 
   return (
@@ -160,7 +159,7 @@ export default function ProductPage() {
       {/* ===== sticky header ===== */}
       <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F2F4" }}>
         <div className="flex items-center gap-3 px-4 py-3">
-          <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ChevronDown size={20} style={{ color: "#1A1A1A" }} /></button>
+          <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ChevronDown size={20} style={{ color: "#1A1A1A" }} /></button>
           <h1 className="flex-1 min-w-0 text-lg font-extrabold truncate" style={{ color: "#1A1A1A" }}>{MAIN.name}</h1>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Heart size={18} style={{ color: "#1A1A1A" }} /></button>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={18} style={{ color: "#1A1A1A" }} /></button>
@@ -278,7 +277,7 @@ export default function ProductPage() {
               <p className="text-xs" style={{ color: "#9AA3AF" }}>شامل كل الضرائب</p>
             </div>
             {mainQty === 0 ? (
-              <button onClick={() => add(MAIN.id)} className="cta rounded-xl text-base font-extrabold shrink-0" style={{ padding: "13px 30px" }}>أضف إلى السلة</button>
+              <button onClick={() => { add(MAIN); nav("/cart"); }} className="cta rounded-xl text-base font-extrabold shrink-0" style={{ padding: "13px 30px" }}>أضف إلى السلة</button>
             ) : (
               <div className="stepper rounded-xl overflow-hidden flex items-center shrink-0">
                 <button onClick={() => dec(MAIN.id)} className="stepper-btn" style={{ padding: "13px 16px" }}><Minus size={18} strokeWidth={2.8} /></button>

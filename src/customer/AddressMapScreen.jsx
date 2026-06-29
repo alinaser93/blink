@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight, Search, MapPin, LocateFixed, Home, Briefcase, ChevronLeft } from "lucide-react";
 
 const STYLE = `
@@ -52,6 +53,7 @@ const TYPES = [
 ];
 
 export default function AddressMapScreen() {
+  const nav = useNavigate();
   const [q, setQ] = useState("");
   const [type, setType] = useState("home");
   const [addr, setAddr] = useState("شارع الكورنيش، السماوة، المثنى");
@@ -63,7 +65,7 @@ export default function AddressMapScreen() {
       {/* header */}
       <div className="shrink-0" style={{ background: "#fff", borderBottom: "1px solid #F1F2F4" }}>
         <div className="flex items-center gap-3 px-4 py-3">
-          <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} /></button>
+          <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} /></button>
           <h1 className="text-lg font-extrabold">أضف عنوان التوصيل</h1>
         </div>
         <div className="px-4 pb-3">
@@ -115,7 +117,7 @@ export default function AddressMapScreen() {
             ))}
           </div>
 
-          <button className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-center gap-2" style={{ padding: "14px" }}>أكّد الموقع وتابع <ChevronLeft size={18} /></button>
+          <button onClick={() => nav("/cart")} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-center gap-2" style={{ padding: "14px" }}>أكّد الموقع وتابع <ChevronLeft size={18} /></button>
         </div>
       </div>
     </div>

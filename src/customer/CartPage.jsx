@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "./cart.jsx";
 import {
   ArrowRight, Search, Share2, ChevronLeft, Heart, Plus, Minus,
   Mic, PhoneOff, BellOff, Gift, CreditCard, Wallet, Banknote, Star, Clock,
@@ -107,24 +109,18 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
 /*  Cart / Checkout                                                   */
 /* ================================================================== */
 export default function CartPage() {
+  const cart = useCart();
+  const nav = useNavigate();
   const [view, setView] = useState("cart");
-  const [items, setItems] = useState(CART_INIT);
-  const [extra, setExtra] = useState({});
   const [tip, setTip] = useState(0);
   const [instr, setInstr] = useState({ call: false, bell: false });
   const [pay, setPay] = useState("cod");
 
-  const setQty = (id, d) => setItems((arr) => arr.map((it) => it.id === id ? { ...it, qty: it.qty + d } : it).filter((it) => it.qty > 0));
-  const addExtra = (id) => setExtra((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const incExtra = (id) => setExtra((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const decExtra = (id) => setExtra((m) => { const q = (m[id] || 0) - 1; const n = { ...m }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
-
-  const extraItems = SUGGEST.filter((p) => extra[p.id]).map((p) => ({ ...p, qty: extra[p.id] }));
-  const allItems = [...items, ...extraItems];
-  const itemsTotal = allItems.reduce((s, it) => s + it.price * it.qty, 0);
-  const savings = allItems.reduce((s, it) => s + ((it.mrp || it.price) - it.price) * it.qty, 0);
+  const items = cart.list;
+  const itemsTotal = cart.subtotal;
+  const savings = items.reduce((s, it) => s + ((it.mrp || it.price) - it.price) * it.qty, 0);
   const delivery = itemsTotal >= FREE_AT || itemsTotal === 0 ? 0 : 2000;
-  const toPay = itemsTotal + delivery + HANDLING + tip;
+  const toPay = itemsTotal + delivery + (items.length ? HANDLING : 0) + tip;
 
   /* ---------------- PAYMENT VIEW ---------------- */
   if (view === "pay") {
@@ -172,7 +168,7 @@ export default function CartPage() {
 
         <div className="fixed left-0 right-0 bottom-0 z-50" style={{ background: "#fff", borderTop: "1px solid #ECECEC", boxShadow: "0 -6px 20px rgba(16,24,40,.07)" }}>
           <div className="px-4 py-3">
-            <button className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-center gap-2" style={{ padding: "15px" }}>تأكيد الطلب · {iqd(toPay)}</button>
+            <button onClick={() => { cart.clear(); nav("/track"); }} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-center gap-2" style={{ padding: "15px" }}>تأكيد الطلب · {iqd(toPay)}</button>
           </div>
         </div>
       </div>
@@ -187,7 +183,7 @@ export default function CartPage() {
       {/* header */}
       <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F2F4" }}>
         <div className="flex items-center gap-3 px-4 py-3">
-          <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} /></button>
+          <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} /></button>
           <h1 className="flex-1 text-xl font-extrabold">السلة</h1>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={19} /></button>
           <button className="icon-btn rounded-full flex items-center gap-1.5 shrink-0" style={{ border: "1px solid #ECECEC", padding: "8px 14px" }}><Share2 size={16} /><span className="text-sm font-bold">مشاركة</span></button>
@@ -204,13 +200,13 @@ export default function CartPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold leading-tight" style={{ color: "#1A1A1A" }}>{it.name}</p>
                 <p className="text-xs mt-0.5" style={{ color: "#7A8493" }}>{it.weight}</p>
-                <button className="text-xs mt-1 font-semibold" style={{ color: "#9AA3AF", textDecoration: "underline" }}>نقل إلى المفضّلة</button>
+                <button onClick={() => cart.remove(it.id)} className="text-xs mt-1 font-semibold" style={{ color: "#9AA3AF", textDecoration: "underline" }}>نقل إلى المفضّلة</button>
               </div>
               <div className="flex flex-col items-end gap-1.5 shrink-0">
                 <div className="stepper rounded-lg overflow-hidden flex items-center">
-                  <button onClick={() => setQty(it.id, -1)} className="stepper-btn" style={{ padding: "6px 10px" }}><Minus size={14} strokeWidth={2.8} /></button>
+                  <button onClick={() => cart.dec(it.id)} className="stepper-btn" style={{ padding: "6px 10px" }}><Minus size={14} strokeWidth={2.8} /></button>
                   <span className="text-sm font-extrabold" style={{ width: 20, textAlign: "center" }}>{it.qty}</span>
-                  <button onClick={() => setQty(it.id, 1)} className="stepper-btn" style={{ padding: "6px 10px" }}><Plus size={14} strokeWidth={2.8} /></button>
+                  <button onClick={() => cart.inc(it.id)} className="stepper-btn" style={{ padding: "6px 10px" }}><Plus size={14} strokeWidth={2.8} /></button>
                 </div>
                 <div className="flex items-baseline gap-1.5">
                   {it.mrp > it.price && <span className="text-xs line-through" style={{ color: "#9AA3AF" }}>{iqd(it.mrp * it.qty)}</span>}
@@ -244,7 +240,7 @@ export default function CartPage() {
         <section className="mt-4 px-3">
           <h2 className="text-lg font-extrabold mb-3 px-0.5">قد يعجبك أيضاً</h2>
           <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-2.5 gap-y-5">
-            {SUGGEST.map((p) => <ProductCard key={p.id} p={p} qty={extra[p.id] || 0} onAdd={() => addExtra(p.id)} onInc={() => incExtra(p.id)} onDec={() => decExtra(p.id)} />)}
+            {SUGGEST.map((p) => <ProductCard key={p.id} p={p} qty={cart.qty(p.id)} onAdd={() => cart.add(p)} onInc={() => cart.inc(p.id)} onDec={() => cart.dec(p.id)} />)}
           </div>
         </section>
 
@@ -300,15 +296,15 @@ export default function CartPage() {
 
       {/* bottom: address + pay button */}
       <div className="fixed left-0 right-0 bottom-0 z-50" style={{ background: "#fff", borderTop: "1px solid #ECECEC", boxShadow: "0 -6px 20px rgba(16,24,40,.07)" }}>
-        <div className="linkrow flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: "1px solid #F2F3F5" }}>
+        <div onClick={() => nav("/address")} className="linkrow flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: "1px solid #F2F3F5" }}>
           <Home size={26} style={{ color: "#E0A800" }} />
           <div className="flex-1 min-w-0"><p className="text-sm font-extrabold">التوصيل إلى البيت</p><p className="text-xs truncate" style={{ color: "#7A8493" }}>علي، السماوة، شارع الكورنيش...</p></div>
           <span className="text-sm font-extrabold shrink-0" style={{ color: "#0C831F" }}>تغيير</span>
         </div>
         <div className="px-4 py-3">
-          <button onClick={() => setView("pay")} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-between" style={{ padding: "14px 18px" }}>
-            <span>{iqd(toPay)}</span>
-            <span className="flex items-center gap-1">اختر طريقة الدفع <ChevronLeft size={18} /></span>
+          <button onClick={() => items.length ? setView("pay") : nav("/")} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-between" style={{ padding: "14px 18px" }}>
+            <span>{items.length ? iqd(toPay) : ""}</span>
+            <span className="flex items-center gap-1">{items.length ? "اختر طريقة الدفع" : "ابدأ التسوّق الآن"} <ChevronLeft size={18} /></span>
           </button>
         </div>
       </div>

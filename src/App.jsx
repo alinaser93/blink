@@ -1,7 +1,6 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
-import Launcher from "./Launcher.jsx";
-import Frame from "./Frame.jsx";
+import { Routes, Route, Outlet } from "react-router-dom";
+import { CartProvider } from "./customer/cart.jsx";
 
 import HomePage from "./customer/HomePage.jsx";
 import CategoryPage from "./customer/CategoryPage.jsx";
@@ -12,19 +11,32 @@ import AddressMapScreen from "./customer/AddressMapScreen.jsx";
 import OrderTrackingScreen from "./customer/OrderTrackingScreen.jsx";
 import AdminDashboard from "./admin/AdminDashboard.jsx";
 
+// تغليف شاشات الزبون بسلة مشتركة
+function CustomerLayout() {
+  return (
+    <CartProvider>
+      <Outlet />
+    </CartProvider>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Launcher />} />
-      <Route path="/app" element={<Frame><HomePage /></Frame>} />
-      <Route path="/app/category" element={<Frame><CategoryPage /></Frame>} />
-      <Route path="/app/product" element={<Frame><ProductPage /></Frame>} />
-      <Route path="/app/search" element={<Frame><SearchPage /></Frame>} />
-      <Route path="/app/cart" element={<Frame><CartPage /></Frame>} />
-      <Route path="/app/address" element={<Frame><AddressMapScreen /></Frame>} />
-      <Route path="/app/track" element={<Frame><OrderTrackingScreen /></Frame>} />
-      <Route path="/admin" element={<Frame><AdminDashboard /></Frame>} />
-      <Route path="*" element={<Launcher />} />
+      {/* لوحة التاجر — منفصلة تماماً على /admin */}
+      <Route path="/admin" element={<AdminDashboard />} />
+
+      {/* تطبيق الزبون — يفتح مباشرة على الرئيسية */}
+      <Route element={<CustomerLayout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/category" element={<CategoryPage />} />
+        <Route path="/product" element={<ProductPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/address" element={<AddressMapScreen />} />
+        <Route path="/track" element={<OrderTrackingScreen />} />
+        <Route path="*" element={<HomePage />} />
+      </Route>
     </Routes>
   );
 }

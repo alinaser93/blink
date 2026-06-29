@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "./cart.jsx";
 import {
   ArrowRight, X, Mic, Search, Clock, TrendingUp, ChevronDown, ChevronLeft,
   SlidersHorizontal, ArrowUpDown, Heart, Plus, Minus, Star, Bike, Wheat,
@@ -120,16 +122,13 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [bannerOpen, setBannerOpen] = useState(true);
-  const [cart, setCart] = useState({});
   const inputRef = useRef(null);
+  const nav = useNavigate();
+  const { qty, add, inc, dec, subtotal } = useCart();
 
   useEffect(() => { inputRef.current && inputRef.current.focus(); }, []);
 
-  const subtotal = Object.entries(cart).reduce((s, [id, q]) => { const p = RESULTS.find((x) => x.id === +id); return s + (p ? p.price * q : 0); }, 0);
   const remaining = Math.max(0, FREE_AT - subtotal);
-  const add = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const inc = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const dec = (id) => setCart((m) => { const q = (m[id] || 0) - 1; const n = { ...m }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
 
   const go = (term) => { setQuery(term); setSubmitted(true); };
   const onType = (e) => { setQuery(e.target.value); setSubmitted(false); };
@@ -149,7 +148,7 @@ export default function SearchPage() {
       <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F2F4" }}>
         <div className="px-3 py-3">
           <div className="search-wrap flex items-center gap-2 rounded-xl px-3" style={{ background: "#fff", height: 48 }}>
-            <button onClick={() => setSubmitted(false)} className="icon-btn shrink-0"><ArrowRight size={20} style={{ color: "#1A1A1A" }} /></button>
+            <button onClick={() => (submitted ? setSubmitted(false) : nav(-1))} className="icon-btn shrink-0"><ArrowRight size={20} style={{ color: "#1A1A1A" }} /></button>
             <input ref={inputRef} value={query} onChange={onType} onKeyDown={(e) => e.key === "Enter" && query && setSubmitted(true)} placeholder="دور على مسواگ، لحم، خضار..." className="flex-1 bg-transparent outline-none text-sm font-medium" style={{ color: "#1A1A1A" }} />
             {query && <button onClick={clearQ} className="icon-btn rounded-full p-0.5 shrink-0" style={{ background: "#E5E8EC" }}><X size={15} style={{ color: "#5A6473" }} /></button>}
             <span style={{ width: 1, height: 22, background: "#E3E6EB" }} />
@@ -170,7 +169,7 @@ export default function SearchPage() {
           </div>
 
           <section className="px-3 pt-4">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{RESULTS.slice(0, 4).map((p) => <ProductCard key={p.id} p={p} qty={cart[p.id] || 0} onAdd={() => add(p.id)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{RESULTS.slice(0, 4).map((p) => <ProductCard key={p.id} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
           </section>
 
           <section className="px-3 pt-6">
@@ -188,7 +187,7 @@ export default function SearchPage() {
           </section>
 
           <section className="px-3 pt-6">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{RESULTS.slice(4).concat(RESULTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={cart[p.id] || 0} onAdd={() => add(p.id)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{RESULTS.slice(4).concat(RESULTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
           </section>
 
           <div style={{ height: 90 }} />

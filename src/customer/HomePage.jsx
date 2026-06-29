@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "./cart.jsx";
 import {
   MapPin, ChevronDown, ChevronLeft, Wallet, User, Search, Mic, X, Clock,
-  Bike, Home, Printer, LayoutGrid, ShoppingBag, Umbrella, Headphones, Sparkles, Lamp,
+  Bike, Home, Printer, LayoutGrid, ShoppingBag, ShoppingCart, Umbrella, Headphones, Sparkles, Lamp,
   Carrot, Wheat, Droplet, Milk, Croissant, Bean, Drumstick, CookingPot,
   Popcorn, Candy, CupSoda, Coffee, Soup, Sandwich, IceCreamCone,
   Scissors, Brush, Flower2, Baby, Pill, Wind,
@@ -280,8 +282,10 @@ const ADDRESSES = [
   { id: "najaf", label: "بيت الأهل", line: "النجف، حي السعد" },
 ];
 const NAV = [
-  { id: "home", label: "الرئيسية", Icon: Home }, { id: "reorder", label: "اطلب مجدداً", Icon: ShoppingBag },
-  { id: "cats", label: "الأقسام", Icon: LayoutGrid }, { id: "print", label: "طباعة", Icon: Printer },
+  { id: "home", label: "الرئيسية", Icon: Home, to: "/" },
+  { id: "cats", label: "الأقسام", Icon: LayoutGrid, to: "/category" },
+  { id: "search", label: "البحث", Icon: Search, to: "/search" },
+  { id: "cart", label: "السلة", Icon: ShoppingCart, to: "/cart" },
 ];
 
 const FREE_AT = 15000;
@@ -365,7 +369,7 @@ function Feed({ title, sub, items, accent, Icon, c }) {
       {sub && <p className="text-xs font-bold px-0.5 mt-0.5" style={{ color: "#9AA3AF" }}>{sub}</p>}
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-2.5 gap-y-5 mt-3">
         {items.map((p) => (
-          <ProductCard key={p.id} p={p} accent={accent} Icon={Icon} qty={c.cart[p.id] || 0} onAdd={() => c.add(p.id)} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} />
+          <ProductCard key={p.id} p={p} accent={accent} Icon={Icon} qty={c.qty(p.id)} onAdd={() => c.add({ ...p, Icon, accent })} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} />
         ))}
       </div>
       <button className="see-all w-full rounded-2xl mt-4 flex items-center justify-center gap-2 py-3 text-sm font-extrabold" style={{ color: "#2A3FB8" }}>عرض كل المنتجات <ChevronLeft size={16} /></button>
@@ -451,8 +455,8 @@ export default function HomePage() {
   const [locOpen, setLocOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [bannerOpen, setBannerOpen] = useState(true);
-  const [tab, setTab] = useState("home");
-  const [cart, setCart] = useState({});
+  const nav = useNavigate();
+  const { qty, add, inc, dec, subtotal, count } = useCart();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(150);
@@ -465,13 +469,8 @@ export default function HomePage() {
 
   const theme = THEMES[activeTab] || THEMES.all;
   const address = ADDRESSES.find((a) => a.id === addrId);
-  const subtotal = Object.entries(cart).reduce((s, [id, q]) => { const p = ALL_PRODUCTS.find((x) => x.id === +id); return s + (p ? p.price * q : 0); }, 0);
   const remaining = Math.max(0, FREE_AT - subtotal);
-
-  const add = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const inc = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const dec = (id) => setCart((m) => { const q = (m[id] || 0) - 1; const n = { ...m }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
-  const c = { cart, add, inc, dec };
+  const c = { qty, add, inc, dec };
 
   return (
     <div className="qc-app min-h-screen" dir="rtl" lang="ar">
@@ -520,8 +519,8 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 pt-2.5 pb-2">
           <div className="search-wrap flex items-center gap-2.5 rounded-xl px-3" style={{ background: "#FFFFFF", height: 46 }}>
             <Search size={20} style={{ color: "#9AA3AF" }} />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="دور على مسواگ، لحم، خضار..." className="flex-1 bg-transparent outline-none text-sm font-medium" style={{ color: "#1A1A1A" }} />
-            {search ? (<button onClick={() => setSearch("")} className="icon-btn rounded-full p-1"><X size={18} style={{ color: "#9AA3AF" }} /></button>) : (<Mic size={18} style={{ color: "#0C831F" }} />)}
+            <input value={search} readOnly onClick={() => nav("/search")} placeholder="دور على مسواگ، لحم، خضار..." className="flex-1 bg-transparent outline-none text-sm font-medium" style={{ color: "#1A1A1A", cursor: "pointer" }} />
+            <Mic size={18} style={{ color: "#0C831F" }} />
           </div>
           <div className="flex gap-1 overflow-x-auto no-scrollbar mt-2.5">
             {TABS.map((t) => {
@@ -636,10 +635,13 @@ export default function HomePage() {
         <nav className="bottom-nav">
           <div className="max-w-6xl mx-auto grid grid-cols-4">
             {NAV.map((n) => {
-              const on = tab === n.id;
+              const on = n.to === "/";
               return (
-                <button key={n.id} onClick={() => setTab(n.id)} className="nav-btn flex flex-col items-center gap-0.5 py-2.5">
-                  <n.Icon size={22} strokeWidth={on ? 2.4 : 2} style={{ color: on ? "#E0A800" : "#2E3640" }} fill={on && n.id === "home" ? "#E0A800" : "none"} />
+                <button key={n.id} onClick={() => nav(n.to)} className="nav-btn flex flex-col items-center gap-0.5 py-2.5">
+                  <span style={{ position: "relative", display: "inline-flex" }}>
+                    <n.Icon size={22} strokeWidth={on ? 2.4 : 2} style={{ color: on ? "#E0A800" : "#2E3640" }} fill={on && n.id === "home" ? "#E0A800" : "none"} />
+                    {n.id === "cart" && count > 0 && <span style={{ position: "absolute", top: -6, insetInlineEnd: -9, background: "#0C831F", color: "#fff", fontSize: 10, fontWeight: 800, borderRadius: 999, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{count}</span>}
+                  </span>
                   <span className="nav-txt font-bold" style={{ color: on ? "#1A1A1A" : "#2E3640" }}>{n.label}</span>
                 </button>
               );

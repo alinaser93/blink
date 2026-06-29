@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "./cart.jsx";
 import {
   ArrowRight, Search, Share2, ChevronDown, ChevronLeft, SlidersHorizontal, ArrowUpDown,
   ShoppingBasket, Carrot, Apple, Grape, Leaf, Salad, Sprout, Flower2, Cherry, Snowflake,
@@ -150,7 +152,8 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
 export default function CategoryPage() {
   const [activeSub, setActiveSub] = useState("الكل");
   const [bannerOpen, setBannerOpen] = useState(true);
-  const [cart, setCart] = useState({});
+  const nav = useNavigate();
+  const { qty, add, inc, dec, subtotal } = useCart();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(70);
@@ -161,12 +164,12 @@ export default function CategoryPage() {
     return () => window.removeEventListener("resize", measure);
   }, [bannerOpen]);
 
-  const subtotal = Object.entries(cart).reduce((s, [id, q]) => { const p = ALL.find((x) => x.id === +id); return s + (p ? p.price * q : 0); }, 0);
   const remaining = Math.max(0, FREE_AT - subtotal);
-  const add = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const inc = (id) => setCart((m) => ({ ...m, [id]: (m[id] || 0) + 1 }));
-  const dec = (id) => setCart((m) => { const q = (m[id] || 0) - 1; const n = { ...m }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
-  const card = (p) => <ProductCard key={p.id} p={p} qty={cart[p.id] || 0} onAdd={() => add(p.id)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />;
+  const card = (p) => (
+    <div key={p.id} onClick={() => nav("/product")} style={{ cursor: "pointer" }}>
+      <ProductCard p={p} qty={qty(p.id)} onAdd={(e) => { e.stopPropagation(); add(p); }} onInc={(e) => { e.stopPropagation(); inc(p.id); }} onDec={(e) => { e.stopPropagation(); dec(p.id); }} />
+    </div>
+  );
 
   return (
     <div className="qc-app min-h-screen" dir="rtl" lang="ar">
@@ -175,7 +178,7 @@ export default function CategoryPage() {
       {/* ===== HEADER ===== */}
       <div style={{ background: "#fff", borderBottom: "1px solid #F0F0F0" }}>
         <div className="flex items-center gap-3 px-4 py-3">
-          <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} style={{ color: "#1A1A1A" }} /></button>
+          <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} style={{ color: "#1A1A1A" }} /></button>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-extrabold leading-tight truncate" style={{ color: "#1A1A1A" }}>{CATEGORY}</h1>
             <div className="flex items-center gap-1 mt-0.5">
@@ -258,7 +261,7 @@ export default function CategoryPage() {
           {/* more */}
           <section className="px-3 pt-6">
             <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>وصل حديثاً</h2>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{PRODUCTS.slice(4).concat(PRODUCTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={cart[p.id] || 0} onAdd={() => add(p.id)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{PRODUCTS.slice(4).concat(PRODUCTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
           </section>
         </div>
       </div>

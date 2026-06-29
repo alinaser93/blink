@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight, Phone, MessageSquare, Clock, ChevronLeft, Home, Star, Headphones } from "lucide-react";
 
 const STYLE = `
@@ -64,6 +65,7 @@ const iqd = (n) => Number(n).toLocaleString("en-US") + " د.ع";
 const pad = (n) => String(n).padStart(2, "0");
 
 export default function OrderTrackingScreen() {
+  const nav = useNavigate();
   const [secs, setSecs] = useState(8 * 60);
   useEffect(() => {
     const t = setInterval(() => setSecs((s) => (s > 0 ? s - 1 : 0)), 1000);
@@ -78,7 +80,7 @@ export default function OrderTrackingScreen() {
       {/* map */}
       <div className="relative" style={{ height: "38vh", minHeight: 260, background: "#E9EDF1" }}>
         <TrackMap />
-        <button className="icon-btn absolute w-10 h-10 rounded-full flex items-center justify-center" style={{ top: 14, insetInlineStart: 14, background: "#fff", boxShadow: "0 2px 8px rgba(16,24,40,.18)" }}><ArrowRight size={20} /></button>
+        <button onClick={() => nav("/")} className="icon-btn absolute w-10 h-10 rounded-full flex items-center justify-center" style={{ top: 14, insetInlineStart: 14, background: "#fff", boxShadow: "0 2px 8px rgba(16,24,40,.18)" }}><ArrowRight size={20} /></button>
         <div className="absolute" style={{ top: 16, insetInlineStart: "50%", transform: "translateX(50%)" }}>
           <span className="text-xs font-extrabold rounded-full inline-flex items-center gap-1" style={{ background: "#1A1A1A", color: "#fff", padding: "6px 12px" }}><Clock size={13} /> الوصول خلال {mins} دقيقة</span>
         </div>
