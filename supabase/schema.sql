@@ -1,15 +1,15 @@
 -- =====================================================================
---  سلّـة — Quick Commerce Platform · Core PostgreSQL Schema (Supabase)
---  Run this directly in: Supabase Dashboard → SQL Editor → New query → Run
---  Safe to re-run (idempotent: IF NOT EXISTS / DROP POLICY IF EXISTS).
+--  سلّـة — منصّة كويك كومرس بنموذج "بلينكِت" (مخزون مركزي / Dark Store)
+--  كتالوج واحد موحّد — لا يوجد بائعون متعددون ظاهرون للزبون.
+--  شغّل هذا مباشرةً في: Supabase → SQL Editor → New query → Run
+--  آمن لإعادة التشغيل (idempotent: IF NOT EXISTS / DROP IF EXISTS).
 -- =====================================================================
 
--- gen_random_uuid() lives in pgcrypto (preinstalled on Supabase, but be explicit)
+-- gen_random_uuid() موجودة ضمن pgcrypto (مثبّتة مسبقاً على Supabase)
 create extension if not exists pgcrypto;
 
 -- =====================================================================
---  ENUM TYPES — controlled vocabularies for role & order status
---  (cleaner & safer than free-text; rejects invalid values at the DB)
+--  أنواع ENUM — قوائم محصورة للأدوار وحالة الطلب (أأمن من النص الحر)
 -- =====================================================================
 do $$ begin
   create type user_role as enum ('customer', 'admin', 'rider');
@@ -21,98 +21,104 @@ exception when duplicate_object then null; end $$;
 
 
 -- =====================================================================
---  1) USERS
---  App profiles. `id` is intended to match Supabase Auth user id
---  (auth.users.id) so each authenticated user has one profile row.
+--  1) USERS — المستخدمون
+--  ملف واحد لكل مستخدم (زبون/أدمن/مندوب). الحقل id يُقصد به أن يطابق
+--  معرّف مستخدم Supabase Auth (auth.users.id).
 -- =====================================================================
 create table if not exists public.users (
   id          uuid primary key default gen_random_uuid(),
   full_name   text not null,
-  phone       text unique,                       -- login / contact number
+  phone       text unique,                       -- رقم تسجيل الدخول / التواصل
   role        user_role not null default 'customer',
   created_at  timestamptz not null default now()
 );
-comment on table  public.users is 'ملفات المستخدمين: زبائن، تجّار/أدمن، ومناديب. id يطابق auth.users.id';
-comment on column public.users.role is 'دور المستخدم: customer | admin | rider';
+comment on table  public.users is 'المستخدمون: زبائن، أدمن (إدارة الـ Dark Store)، ومناديب توصيل';
+comment on column public.users.role is 'الدور: customer | admin | rider';
 
 
 -- =====================================================================
---  2) CATEGORIES
---  Product groupings shown on the storefront (خضار، ألبان، مشروبات...).
+--  2) CATEGORIES — الأقسام (شجرية)
+--  parent_category_id يشير إلى نفس الجدول لدعم الأقسام الفرعية:
+--    NULL = قسم رئيسي،  وغير NULL = قسم فرعي تابع لقسم أب.
+--  عند حذف القسم الأب تُحذف أقسامه الفرعية (CASCADE).
 -- =====================================================================
 create table if not exists public.categories (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null,
-  icon_url    text,                              -- أيقونة/صورة القسم
-  created_at  timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),
+  name                text not null,
+  icon_url            text,                       -- أيقونة/صورة القسم
+  parent_category_id  uuid references public.categories(id) on delete cascade,
+  created_at          timestamptz not null default now()
 );
-comment on table public.categories is 'أقسام المنتجات في المتجر';
+comment on table  public.categories is 'أقسام الكتالوج الموحّد، تدعم التشجير عبر parent_category_id';
+comment on column public.categories.parent_category_id is 'NULL = قسم رئيسي، غير NULL = قسم فرعي';
+create index if not exists idx_categories_parent on public.categories(parent_category_id);
 
 
 -- =====================================================================
---  3) PRODUCTS
---  Catalog items. category_id → categories (set null if category removed,
---  so products are never silently deleted).
+--  3) PRODUCTS — المنتجات (كتالوج واحد موحّد)
+--  كل منتج يتبع المخزون المركزي. category_id يربطه بقسم؛ عند حذف القسم
+--  يُحوَّل إلى NULL (لا يُحذف المنتج). internal_supplier_name حقل داخلي
+--  للإدارة فقط (المورّد) ولا يُعرض للزبون أبداً.
 -- =====================================================================
 create table if not exists public.products (
-  id              uuid primary key default gen_random_uuid(),
-  category_id     uuid references public.categories(id) on delete set null,
-  name            text not null,
-  weight_label    text,                          -- وصف الكمية: "500 غرام" / "1 لتر"
-  price           integer not null default 0 check (price >= 0),         -- بالدينار العراقي (IQD)
-  stock_quantity  integer not null default 0 check (stock_quantity >= 0),
-  image_url       text,
-  created_at      timestamptz not null default now()
+  id                      uuid primary key default gen_random_uuid(),
+  category_id             uuid references public.categories(id) on delete set null,
+  name                    text not null,
+  weight_label            text,                   -- وصف الكمية: "500 غرام" / "1 لتر"
+  price_iqd               integer not null default 0 check (price_iqd >= 0),       -- السعر بالدينار العراقي
+  stock_quantity          integer not null default 0 check (stock_quantity >= 0),  -- المخزون المتوفّر
+  image_url               text,
+  internal_supplier_name  text,                   -- داخلي فقط (المورّد) — لا يظهر للزبون
+  created_at              timestamptz not null default now()
 );
-comment on table  public.products is 'منتجات المتجر';
-comment on column public.products.price is 'السعر بالدينار العراقي (عدد صحيح، بدون كسور)';
+comment on table  public.products is 'المنتجات ضمن كتالوج موحّد لمخزن مركزي (نموذج بلينكِت)';
+comment on column public.products.price_iqd is 'السعر بالدينار العراقي (عدد صحيح، بدون كسور)';
+comment on column public.products.internal_supplier_name is 'اسم المورّد — للاستخدام الداخلي/الإداري فقط، لا يُعرض للزبائن';
 create index if not exists idx_products_category on public.products(category_id);
 
 
 -- =====================================================================
---  4) ORDERS
---  One row per customer order. customer_id & rider_id both → users.
---  rider_id is NULL until a rider is assigned (on dispatch).
+--  4) ORDERS — الطلبات
+--  customer_id و rider_id كلاهما يشير إلى users. يبقى rider_id فارغاً
+--  (NULL) حتى يُعيَّن مندوب عند الانطلاق.
 -- =====================================================================
 create table if not exists public.orders (
-  id                uuid primary key default gen_random_uuid(),
-  customer_id       uuid not null references public.users(id) on delete cascade,
-  rider_id          uuid references public.users(id) on delete set null,
-  total_amount      integer not null default 0 check (total_amount >= 0),  -- IQD
-  status            order_status not null default 'pending',
-  delivery_address  text,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+  id                 uuid primary key default gen_random_uuid(),
+  customer_id        uuid not null references public.users(id) on delete cascade,
+  rider_id           uuid references public.users(id) on delete set null,
+  total_amount_iqd   integer not null default 0 check (total_amount_iqd >= 0),     -- الإجمالي بالدينار
+  status             order_status not null default 'pending',
+  delivery_address   text,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
 );
-comment on table  public.orders is 'الطلبات. الحالة تتغيّر: pending → preparing → dispatched → delivered';
-comment on column public.orders.rider_id is 'المندوب المعيّن — يبقى NULL لحد ما ينطلق الطلب';
+comment on table  public.orders is 'الطلبات. تتغيّر الحالة: pending ← preparing ← dispatched ← delivered';
+comment on column public.orders.rider_id is 'المندوب المعيّن — يبقى NULL لحين تعيينه عند الإرسال';
 create index if not exists idx_orders_customer on public.orders(customer_id);
 create index if not exists idx_orders_rider    on public.orders(rider_id);
 create index if not exists idx_orders_status   on public.orders(status);
 
 
 -- =====================================================================
---  5) ORDER_ITEMS
---  Line items for each order. price_at_time freezes the unit price the
---  moment the order was placed (so later price changes don't rewrite history).
---  order_id cascade-deletes items when an order is removed.
+--  5) ORDER_ITEMS — عناصر الطلب
+--  price_at_time يجمّد سعر الوحدة لحظة الطلب (لقطة تاريخية لا تتأثّر
+--  بتغيّر الأسعار لاحقاً). order_id يُحذف تتابعياً مع الطلب (CASCADE).
 -- =====================================================================
 create table if not exists public.order_items (
   id             uuid primary key default gen_random_uuid(),
   order_id       uuid not null references public.orders(id) on delete cascade,
   product_id     uuid references public.products(id) on delete set null,
   quantity       integer not null default 1 check (quantity > 0),
-  price_at_time  integer not null default 0 check (price_at_time >= 0)     -- IQD, snapshot
+  price_at_time  integer not null default 0 check (price_at_time >= 0)             -- سعر الوحدة وقت الطلب (دينار)
 );
-comment on table  public.order_items is 'عناصر كل طلب';
-comment on column public.order_items.price_at_time is 'سعر الوحدة وقت الطلب (لقطة تاريخية، لا يتغيّر)';
+comment on table  public.order_items is 'عناصر كل طلب (سطور المنتجات)';
+comment on column public.order_items.price_at_time is 'سعر الوحدة لحظة الطلب — لقطة ثابتة لا تتغيّر';
 create index if not exists idx_order_items_order   on public.order_items(order_id);
 create index if not exists idx_order_items_product on public.order_items(product_id);
 
 
 -- =====================================================================
---  AUTO-UPDATE orders.updated_at on every row change
---  (so "last status change" timestamp is always accurate)
+--  تحديث updated_at تلقائياً عند أي تعديل على الطلب
 -- =====================================================================
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
@@ -128,11 +134,10 @@ create trigger trg_orders_updated_at
 
 
 -- =====================================================================
---  REALTIME  ⚡  (CRITICAL)
---  Add `orders` to the supabase_realtime publication so the Admin &
---  Rider apps receive INSERT/UPDATE/DELETE events instantly.
---  REPLICA IDENTITY FULL ensures the OLD row is included in payloads
---  (needed to reliably detect status transitions on UPDATE).
+--  الزمن الحقيقي (Realtime)  ⚡  — حرج
+--  إضافة جدول orders إلى منشور supabase_realtime حتى تستقبل لوحتا
+--  الأدمن والمندوب أي تغيير (إدراج/تحديث/حذف) فوراً.
+--  REPLICA IDENTITY FULL يضمّن إرسال الصف القديم أيضاً (لرصد تبدّل الحالة).
 -- =====================================================================
 alter table public.orders replica identity full;
 
@@ -140,7 +145,7 @@ do $$ begin
   alter publication supabase_realtime add table public.orders;
 exception when duplicate_object then null; end $$;
 
--- (optional) also stream live stock changes to the storefront:
+-- (اختياري) بثّ تغيّر المخزون مباشرةً للمتجر أيضاً:
 -- alter table public.products replica identity full;
 -- do $$ begin
 --   alter publication supabase_realtime add table public.products;
@@ -148,14 +153,12 @@ exception when duplicate_object then null; end $$;
 
 
 -- =====================================================================
---  ROW LEVEL SECURITY (RLS)
---  Enabled on every table. The policies below are PERMISSIVE (open to the
---  anon/public key) to get the prototype working fast.
---  🔒 BEFORE PRODUCTION: replace the write policies with auth-scoped rules,
---     e.g. customers can only read their own orders:
---        using ( auth.uid() = customer_id )
---     and riders only their assigned ones:
---        using ( auth.uid() = rider_id ) , etc.
+--  أمان مستوى الصف (RLS)
+--  مُفعّل على كل الجداول. السياسات أدناه مفتوحة (للمفتاح anon) لتسريع
+--  بناء النموذج الأوّلي.
+--  🔒 قبل الإنتاج: استبدل سياسات الكتابة بقواعد مرتبطة بالمصادقة، مثل:
+--     الزبون يقرأ طلباته فقط:        using ( auth.uid() = customer_id )
+--     المندوب يرى الطلبات المعيّنة له: using ( auth.uid() = rider_id )
 -- =====================================================================
 alter table public.users       enable row level security;
 alter table public.categories  enable row level security;
@@ -166,8 +169,8 @@ alter table public.order_items enable row level security;
 -- USERS
 drop policy if exists "users read"  on public.users;
 drop policy if exists "users write" on public.users;
-create policy "users read"  on public.users  for select using (true);
-create policy "users write" on public.users  for all    using (true) with check (true);
+create policy "users read"  on public.users for select using (true);
+create policy "users write" on public.users for all    using (true) with check (true);
 
 -- CATEGORIES
 drop policy if exists "categories read"  on public.categories;
@@ -194,6 +197,6 @@ create policy "order_items read"  on public.order_items for select using (true);
 create policy "order_items write" on public.order_items for all    using (true) with check (true);
 
 -- =====================================================================
---  DONE ✅  Tables, keys, indexes, realtime (orders), triggers, RLS.
---  Next: SQL Editor → run your seed inserts, or insert from the apps.
+--  تمّ ✅  الجداول + المفاتيح + الفهارس + الزمن الحقيقي (orders) + RLS.
+--  التالي: شغّل ملف الـ seed لتعبئة بيانات تجريبية، أو أدخِل من التطبيقات.
 -- =====================================================================
