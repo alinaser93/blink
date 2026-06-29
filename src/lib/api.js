@@ -1,11 +1,29 @@
 import { supabase, isLive } from "./supabase.js";
 import { ICON_MAP, MOCK_PRODUCTS, MOCK_ORDERS, MOCK_CUSTOMERS, MOCK_RIDERS } from "./mockData.js";
 
-export { isLive };
+export { isLive, ICON_MAP };
 
 // سكيمة بلينكِت تخزّن image_url (لا اسم أيقونة) -> نشتقّ أيقونة + لون من القسم
-const CAT_ICON   = { "خضار وفواكه": "Carrot", "ألبان": "Milk", "مشروبات": "CupSoda", "بقالة": "Wheat", "سناكس": "Popcorn" };
-const CAT_ACCENT = { "خضار وفواكه": "#D33A3A", "ألبان": "#2B7A9B", "مشروبات": "#23306E", "بقالة": "#9A6B2E", "سناكس": "#E0A21F" };
+export const CAT_ICON   = { "خضار وفواكه": "Carrot", "ألبان": "Milk", "مشروبات": "CupSoda", "بقالة": "Wheat", "سناكس": "Popcorn" };
+export const CAT_ACCENT = { "خضار وفواكه": "#D33A3A", "ألبان": "#2B7A9B", "مشروبات": "#23306E", "بقالة": "#9A6B2E", "سناكس": "#E0A21F" };
+
+// الأيقونات المتاحة لاختيار أيقونة القسم (مفاتيح ICON_MAP)
+export const CATEGORY_ICONS = Object.keys(ICON_MAP);
+
+// icon_url يُعاد استخدامه: 'icon:<اسم>' = أيقونة lucide مختارة؛ غير ذلك (رابط/NULL) = لا أيقونة مختارة
+const parseIconName = (s) => (typeof s === "string" && s.startsWith("icon:")) ? s.slice(5) : null;
+
+// أقسام تجريبية (عند عدم الاتصال بـ Supabase) — قابلة للتعديل ضمن الجلسة، مطابقة لشكل seed
+let MOCK_CATEGORIES = [
+  { id: "c1", name: "بقالة",        parentId: null, iconName: "Wheat",   sort: 0 },
+  { id: "c2", name: "خضار وفواكه",  parentId: null, iconName: "Carrot",  sort: 1 },
+  { id: "c3", name: "مشروبات",      parentId: null, iconName: "CupSoda", sort: 2 },
+  { id: "c4", name: "ألبان",        parentId: null, iconName: "Milk",    sort: 3 },
+  { id: "c5", name: "سناكس",        parentId: null, iconName: "Popcorn", sort: 4 },
+  { id: "c6", name: "فواكه",        parentId: "c2", iconName: null,      sort: 0 },
+  { id: "c7", name: "خضروات",       parentId: "c2", iconName: null,      sort: 1 },
+  { id: "c8", name: "معلّبات",      parentId: "c1", iconName: null,      sort: 0 },
+];
 
 // عمود الكانبان  <->  حالة الطلب في قاعدة البيانات
 const STATUS2COL = { pending: "new", preparing: "packing", dispatched: "dispatched", delivered: "delivered" };
@@ -95,4 +113,86 @@ export async function setStock(id, stock) {
   if (!isLive) return;
   const { error } = await supabase.from("products").update({ stock_quantity: stock }).eq("id", id);
   if (error) throw error;
+}
+
+/* ============================ الأقسام (شجرة من مستويين) ============================ */
+/*  parentId=null قسم رئيسي، وغيره تفرّع. الشكل الموحّد: {id,name,parentId,iconName,sort} */
+
+export async function getCategories() {
+  if (!isLive) return MOCK_CATEGORIES.map((c) => ({ ...c })); // نسخة عميقة كي لا تُفسد المصفوفة الأصلية
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id,name,icon_url,parent_category_id,sort_order")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data.map((r) => ({
+    id: r.id,
+    name: r.name,
+    parentId: r.parent_category_id,
+    iconName: parseIconName(r.icon_url),
+    sort: r.sort_order ?? 0,
+  }));
+}
+
+export async function createCategory({ name, iconName = null, parentId = null }) {
+  if (!isLive) {
+    const sibs = MOCK_CATEGORIES.filter((c) => c.parentId === (parentId ?? null));
+    const next = sibs.length ? Math.max(...sibs.map((s) => s.sort)) + 1 : 0;
+    const row = { id: "c" + Date.now(), name, parentId: parentId ?? null, iconName: iconName ?? null, sort: next };
+    MOCK_CATEGORIES.push(row);
+    return { ...row };
+  }
+  // ترتيب التالي ضمن نفس المجموعة (.is للقيمة null و.eq لغيرها)
+  const base = supabase.from("categories").select("sort_order");
+  const { data: sibs, error: sErr } = parentId == null ? await base.is("parent_category_id", null) : await base.eq("parent_category_id", parentId);
+  if (sErr) throw sErr;
+  const next = sibs && sibs.length ? Math.max(...sibs.map((s) => s.sort_order ?? 0)) + 1 : 0;
+  const { data, error } = await supabase
+    .from("categories")
+    .insert({ name, icon_url: iconName ? "icon:" + iconName : null, parent_category_id: parentId ?? null, sort_order: next })
+    .select("id,name,icon_url,parent_category_id,sort_order")
+    .single();
+  if (error) throw error;
+  return { id: data.id, name: data.name, parentId: data.parent_category_id, iconName: parseIconName(data.icon_url), sort: data.sort_order ?? 0 };
+}
+
+export async function updateCategory(id, { name, iconName }) {
+  if (!isLive) {
+    const c = MOCK_CATEGORIES.find((x) => x.id === id);
+    if (c) { if (name !== undefined) c.name = name; if (iconName !== undefined) c.iconName = iconName; }
+    return;
+  }
+  const patch = {};
+  if (name !== undefined) patch.name = name;
+  if (iconName !== undefined) patch.icon_url = iconName ? "icon:" + iconName : null;
+  const { error } = await supabase.from("categories").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCategory(id) {
+  if (!isLive) {
+    MOCK_CATEGORIES = MOCK_CATEGORIES.filter((c) => c.id !== id && c.parentId !== id); // محاكاة الحذف التتابعي
+    return;
+  }
+  // قاعدة البيانات تحذف التفرّعات تتابعياً (CASCADE) وتجعل category_id للمنتجات NULL تلقائياً
+  const { error } = await supabase.from("categories").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// تبديل ترتيب صفّين متجاورين بنفس الأب. swap = { aId, aSort, bId, bSort } محسوبة من المستدعي
+export async function reorderCategory(id, dir, swap) {
+  if (!isLive) {
+    const a = MOCK_CATEGORIES.find((x) => x.id === swap.aId);
+    const b = MOCK_CATEGORIES.find((x) => x.id === swap.bId);
+    if (a) a.sort = swap.aSort;
+    if (b) b.sort = swap.bSort;
+    return;
+  }
+  const rs = await Promise.all([
+    supabase.from("categories").update({ sort_order: swap.aSort }).eq("id", swap.aId),
+    supabase.from("categories").update({ sort_order: swap.bSort }).eq("id", swap.bId),
+  ]);
+  const err = rs.find((r) => r.error);
+  if (err) throw err.error;
 }

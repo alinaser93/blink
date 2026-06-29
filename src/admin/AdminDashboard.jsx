@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LayoutDashboard, Activity, Boxes, Users, BarChart3, Wallet, Clock, AlertTriangle,
   Bike, Bell, Search, Plus, Pencil, Package, CheckCircle2, Settings, Store,
   TrendingUp, ShoppingCart, UserPlus, ArrowUpRight, Minus, Loader2, Menu,
+  FolderTree, Folder, ChevronUp, ChevronDown, Trash2, Check, X,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -10,6 +11,8 @@ import {
 } from "recharts";
 import {
   getProducts, getOrders, getCustomers, getRiders, setOrderStatus, setStock, isLive,
+  getCategories, createCategory, updateCategory, deleteCategory, reorderCategory,
+  ICON_MAP, CAT_ICON, CAT_ACCENT, CATEGORY_ICONS,
 } from "../lib/api.js";
 
 /* ================================================================== */
@@ -67,6 +70,7 @@ const NAV = [
   { id: "dash", label: "الرئيسية", Icon: LayoutDashboard },
   { id: "orders", label: "الطلبات الحية", Icon: Activity },
   { id: "inv", label: "المنتجات والمخزون", Icon: Boxes },
+  { id: "cats", label: "الأقسام", Icon: FolderTree },
   { id: "cust", label: "العملاء", Icon: Users },
   { id: "analytics", label: "التقارير", Icon: BarChart3 },
 ];
@@ -74,6 +78,7 @@ const HEAD = {
   dash: { t: "نظرة عامة", s: "ملخّص أداء فرع السماوة اليوم" },
   orders: { t: "الطلبات الحية", s: "تشغيل الطلبات لحظة بلحظة" },
   inv: { t: "المنتجات والمخزون", s: "إدارة المنتجات وحالة التوفّر" },
+  cats: { t: "الأقسام", s: "إدارة شجرة الأقسام الرئيسية والفرعية" },
   cust: { t: "العملاء", s: "قاعدة عملاء الفرع" },
   analytics: { t: "التقارير والتحليلات", s: "أداء المبيعات والطلبات" },
 };
@@ -412,6 +417,155 @@ function AnalyticsView() {
   );
 }
 
+/* ---- categories: inline add/edit form (name + icon picker) ---- */
+function CatForm({ name, setName, icon, setIcon, onSave, onCancel, placeholder }) {
+  const Prev = ICON_MAP[icon] || ICON_MAP.Package;
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="rounded-lg flex items-center justify-center shrink-0" style={{ width: 36, height: 36, background: "#F3F5F8" }}>
+        <Prev size={18} style={{ color: icon ? "#0C831F" : "#AEB6BF" }} />
+      </span>
+      <input
+        autoFocus value={name} onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+        placeholder={placeholder} className="rounded-lg outline-none text-sm font-bold"
+        style={{ border: "1px solid #E6E9EE", height: 36, padding: "0 12px", minWidth: 0, flex: 1 }}
+      />
+      <select value={icon} onChange={(e) => setIcon(e.target.value)} className="rounded-lg outline-none text-sm" style={{ border: "1px solid #E6E9EE", height: 36, padding: "0 8px", background: "#fff" }}>
+        <option value="">أيقونة تلقائية</option>
+        {CATEGORY_ICONS.map((k) => <option key={k} value={k}>{k}</option>)}
+      </select>
+      <button onClick={onSave} className="icon-btn rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, background: "#EAF6EC", color: "#0C831F" }}><Check size={17} strokeWidth={2.6} /></button>
+      <button onClick={onCancel} className="icon-btn rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, background: "#F1F3F6", color: "#7A8493" }}><X size={17} strokeWidth={2.6} /></button>
+    </div>
+  );
+}
+
+/* ---- categories: up/down/edit/delete action cluster ---- */
+function RowActions({ canUp, canDown, onUp, onDown, onEdit, onDelete }) {
+  const mini = (enabled, onClick, child, color) => (
+    <button onClick={enabled ? onClick : undefined} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 28, height: 28, color, opacity: enabled ? 1 : 0.35, pointerEvents: enabled ? "auto" : "none" }}>{child}</button>
+  );
+  return (
+    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+      {mini(canUp, onUp, <ChevronUp size={15} strokeWidth={2.6} />, "#5A6473")}
+      {mini(canDown, onDown, <ChevronDown size={15} strokeWidth={2.6} />, "#5A6473")}
+      {mini(true, onEdit, <Pencil size={14} />, "#5A6473")}
+      {mini(true, onDelete, <Trash2 size={14} />, "#E11D2A")}
+    </div>
+  );
+}
+
+function CategoriesView({ cats, inv, selT1, setSelT1, onAdd, onEdit, onDelete, onMove }) {
+  const [editId, setEditId] = useState(null);
+  const [eName, setEName] = useState(""); const [eIcon, setEIcon] = useState("");
+  const [adding, setAdding] = useState(null); // "t1" | "t2" | null
+  const [nName, setNName] = useState(""); const [nIcon, setNIcon] = useState("");
+
+  // إغلاق أي نموذج إضافة/تعديل مفتوح عند تبديل القسم الرئيسي المحدّد (يمنع إعادة توجيه الأب)
+  useEffect(() => { setAdding(null); setEditId(null); }, [selT1]);
+
+  const bySort = (a, b) => a.sort - b.sort;
+  const tier1 = cats.filter((c) => c.parentId == null).sort(bySort);
+  const tier2 = cats.filter((c) => c.parentId === selT1).sort(bySort);
+  const childCount = (id) => cats.filter((c) => c.parentId === id).length;
+  const prodCountByName = useMemo(() => inv.reduce((m, p) => { m[p.cat] = (m[p.cat] || 0) + 1; return m; }, {}), [inv]);
+  const uncategorized = inv.filter((p) => p.cat === "أخرى").length;
+  const subCount = cats.filter((c) => c.parentId != null).length;
+
+  const resolveIcon = (c) => ICON_MAP[c.iconName || CAT_ICON[c.name] || "Package"] || ICON_MAP.Package;
+  const accentOf = (c) => CAT_ACCENT[c.name] || "#0C831F";
+  const selRow = tier1.find((t) => t.id === selT1);
+  const selName = selRow?.name;
+  const canAddSub = !!selT1 && !selRow?._pending; // لا تُضِف تفرّعاً لقسم لم يُحفظ بعد
+
+  const startEdit = (c) => { setAdding(null); setEditId(c.id); setEName(c.name); setEIcon(c.iconName || ""); };
+  const cancelEdit = () => { setEditId(null); setEName(""); setEIcon(""); };
+  const saveEdit = () => { const n = eName.trim(); if (!n) return; onEdit(editId, n, eIcon || null); cancelEdit(); };
+
+  const openAdd = (which) => { cancelEdit(); setAdding(which); setNName(""); setNIcon(""); };
+  const cancelAdd = () => { setAdding(null); setNName(""); setNIcon(""); };
+  const submitAdd = () => {
+    const n = nName.trim(); if (!n) return;
+    if (adding === "t2" && !selT1) return;
+    onAdd(n, nIcon || null, adding === "t2" ? selT1 : null);
+    cancelAdd();
+  };
+
+  const confirmDel = (c) => {
+    const msg = c.parentId == null
+      ? "سيتم حذف القسم وكل تفرّعاته، وتصبح منتجاته غير مصنّفة. متابعة؟"
+      : "سيتم حذف هذا التفرّع. متابعة؟";
+    if (window.confirm(msg)) onDelete(c.id);
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Metric label="أقسام رئيسية" num={String(tier1.length)} Icon={FolderTree} tint="#EAF6EC" color="#0C831F" sub="قسم رئيسي" subColor="#9AA3AF" />
+        <Metric label="أقسام فرعية" num={String(subCount)} Icon={Folder} tint="#E8F0FE" color="#2563EB" sub="تفرّع" subColor="#2563EB" />
+        <Metric label="منتجات غير مصنّفة" num={String(uncategorized)} Icon={AlertTriangle} tint="#FEF3E2" color="#D98A1F" sub="بحاجة تصنيف" subColor="#D98A1F" pulse={uncategorized > 0} />
+      </div>
+
+      <div className="panel rounded-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-[320px_1fr]">
+        {/* ===== MASTER: tier1 ===== */}
+        <div style={{ borderInlineEnd: "1px solid #F0F1F3" }}>
+          <div className="flex items-center justify-between gap-2 p-4">
+            <h3 className="text-base font-extrabold">الأقسام الرئيسية</h3>
+            <button onClick={() => openAdd("t1")} className="btn-green rounded-lg flex items-center gap-1.5 text-xs font-extrabold" style={{ padding: "7px 12px" }}><Plus size={15} /> قسم</button>
+          </div>
+          <div className="px-3 pb-3 flex flex-col gap-1 no-scrollbar" style={{ maxHeight: 560, overflowY: "auto" }}>
+            {tier1.length === 0 && adding !== "t1" && <p className="text-center text-sm py-8" style={{ color: "#AEB6BF" }}>لا توجد أقسام بعد</p>}
+            {tier1.map((c, i) => {
+              const Ic = resolveIcon(c); const on = c.id === selT1;
+              if (editId === c.id) return <div key={c.id} className="rounded-xl p-2" style={{ background: "#F7FBF8" }}><CatForm name={eName} setName={setEName} icon={eIcon} setIcon={setEIcon} onSave={saveEdit} onCancel={cancelEdit} placeholder="اسم القسم..." /></div>;
+              return (
+                <div key={c.id} onClick={() => setSelT1(c.id)} className={"side-item flex items-center gap-3 rounded-xl px-3 py-2.5 cursor-pointer " + (on ? "on" : "")} style={c._pending ? { opacity: 0.55 } : undefined}>
+                  <span className="rounded-lg flex items-center justify-center shrink-0" style={{ width: 40, height: 40, background: "#F3F5F8" }}><Ic size={20} style={{ color: accentOf(c) }} /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold truncate">{c.name}</p>
+                    <p className="text-xs" style={{ color: "#9AA3AF" }}>{childCount(c.id)} تفرّع · {prodCountByName[c.name] || 0} منتج</p>
+                  </div>
+                  {!c._pending && <RowActions canUp={i > 0 && !tier1[i - 1]._pending} canDown={i < tier1.length - 1 && !tier1[i + 1]._pending} onUp={() => onMove(c.id, -1)} onDown={() => onMove(c.id, 1)} onEdit={() => startEdit(c)} onDelete={() => confirmDel(c)} />}
+                </div>
+              );
+            })}
+            {adding === "t1" && <div className="rounded-xl p-2" style={{ background: "#F7FBF8" }}><CatForm name={nName} setName={setNName} icon={nIcon} setIcon={setNIcon} onSave={submitAdd} onCancel={cancelAdd} placeholder="اسم القسم الجديد..." /></div>}
+          </div>
+        </div>
+
+        {/* ===== DETAIL: tier2 ===== */}
+        <div>
+          <div className="flex items-center justify-between gap-2 p-4">
+            <h3 className="text-base font-extrabold truncate">تفرّعات: {selName || "—"}</h3>
+            <button onClick={() => canAddSub && openAdd("t2")} className={"rounded-lg flex items-center gap-1.5 text-xs font-extrabold " + (canAddSub ? "btn-green" : "btn-ghost")} style={{ padding: "7px 12px", opacity: canAddSub ? 1 : 0.5, pointerEvents: canAddSub ? "auto" : "none" }}><Plus size={15} /> تفرّع</button>
+          </div>
+          {!selT1 ? (
+            <div className="flex flex-col items-center justify-center" style={{ padding: "64px 16px", color: "#AEB6BF" }}><Folder size={34} /><p className="text-sm font-bold mt-2">اختر قسماً رئيسياً لعرض تفرّعاته</p></div>
+          ) : (
+            <div className="px-3 pb-3">
+              {tier2.length === 0 && adding !== "t2" && <p className="text-center text-sm py-12" style={{ color: "#AEB6BF" }}>لا توجد تفرّعات بعد</p>}
+              {tier2.map((c, i) => {
+                const Ic = resolveIcon(c);
+                if (editId === c.id) return <div key={c.id} className="rounded-xl p-2 my-1" style={{ background: "#F7FBF8" }}><CatForm name={eName} setName={setEName} icon={eIcon} setIcon={setEIcon} onSave={saveEdit} onCancel={cancelEdit} placeholder="اسم التفرّع..." /></div>;
+                return (
+                  <div key={c.id} className="tbl-row flex items-center gap-3 rounded-xl px-3 py-2.5" style={c._pending ? { opacity: 0.55 } : undefined}>
+                    <span className="rounded-lg flex items-center justify-center shrink-0" style={{ width: 32, height: 32, background: "#F3F5F8" }}><Ic size={17} style={{ color: accentOf(c) }} /></span>
+                    <p className="text-sm font-bold flex-1 truncate">{c.name}</p>
+                    {(prodCountByName[c.name] || 0) > 0 && <span className="text-xs font-bold rounded-full px-2 py-0.5" style={{ background: "#F1F3F6", color: "#5A6473" }}>{prodCountByName[c.name]} منتج</span>}
+                    {!c._pending && <RowActions canUp={i > 0 && !tier2[i - 1]._pending} canDown={i < tier2.length - 1 && !tier2[i + 1]._pending} onUp={() => onMove(c.id, -1)} onDown={() => onMove(c.id, 1)} onEdit={() => startEdit(c)} onDelete={() => confirmDel(c)} />}
+                  </div>
+                );
+              })}
+              {adding === "t2" && <div className="rounded-xl p-2 my-1" style={{ background: "#F7FBF8" }}><CatForm name={nName} setName={setNName} icon={nIcon} setIcon={setNIcon} onSave={submitAdd} onCancel={cancelAdd} placeholder="اسم التفرّع الجديد..." /></div>}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function Loading() {
   return (
     <div className="flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
@@ -432,15 +586,18 @@ export default function AdminDashboard() {
   const [inv, setInv] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [riders, setRiders] = useState([]);
+  const [cats, setCats] = useState([]);
+  const [selT1, setSelT1] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [p, o, c, r] = await Promise.all([getProducts(), getOrders(), getCustomers(), getRiders()]);
+        const [p, o, c, r, cat] = await Promise.all([getProducts(), getOrders(), getCustomers(), getRiders(), getCategories()]);
         if (!alive) return;
         setInv(p); setOrders(o); setCustomers(c); setRiders(r);
+        setCats(cat); setSelT1(cat.find((x) => x.parentId == null)?.id ?? null);
       } catch (e) {
         console.error("فشل تحميل البيانات من Supabase:", e);
       } finally {
@@ -449,6 +606,44 @@ export default function AdminDashboard() {
     })();
     return () => { alive = false; };
   }, []);
+
+  // ---- إدارة الأقسام: تحديث متفائل + استدعاء API بلا انتظار (مثل accept/onAdjust) ----
+  const addCat = (name, iconName, parentId) => {
+    const sibs = cats.filter((x) => x.parentId === (parentId ?? null));
+    const nextSort = sibs.length ? Math.max(...sibs.map((s) => s.sort)) + 1 : 0;
+    const tmpId = "tmp" + Date.now();
+    setCats((a) => [...a, { id: tmpId, name, iconName: iconName ?? null, parentId: parentId ?? null, sort: nextSort, _pending: true }]);
+    if (parentId == null) setSelT1((s) => s ?? tmpId);
+    createCategory({ name, iconName: iconName ?? null, parentId: parentId ?? null })
+      .then((real) => {
+        setCats((a) => a.map((x) => (x.id === tmpId ? { ...real, _pending: false } : x)));
+        setSelT1((s) => (s === tmpId ? real.id : s)); // أبقِ التحديد على الصف الحقيقي بعد المزامنة
+      })
+      .catch((e) => { console.error(e); setCats((a) => a.filter((x) => x.id !== tmpId)); });
+  };
+  const editCat = (id, name, iconName) => {
+    setCats((a) => a.map((x) => (x.id === id ? { ...x, name, iconName } : x)));
+    updateCategory(id, { name, iconName }).catch(console.error);
+  };
+  const removeCat = (id) => {
+    const prev = cats;
+    setCats((a) => a.filter((x) => x.id !== id && x.parentId !== id));
+    if (selT1 === id) setSelT1(prev.find((x) => x.parentId == null && x.id !== id)?.id ?? null);
+    deleteCategory(id).catch((e) => { console.error(e); setCats(prev); });
+  };
+  const moveCat = (id, dir) => {
+    const row = cats.find((x) => x.id === id);
+    if (!row || row._pending) return;
+    const sibs = cats.filter((x) => x.parentId === row.parentId && !x._pending).sort((a, b) => a.sort - b.sort);
+    const i = sibs.findIndex((s) => s.id === id);
+    const j = i + dir;
+    if (j < 0 || j >= sibs.length) return;
+    const a = sibs[i], b = sibs[j];
+    const prev = cats;
+    setCats((c) => c.map((x) => (x.id === a.id ? { ...x, sort: b.sort } : x.id === b.id ? { ...x, sort: a.sort } : x)));
+    reorderCategory(id, dir, { aId: a.id, aSort: b.sort, bId: b.id, bSort: a.sort })
+      .catch((e) => { console.error(e); setCats(prev); }); // تراجع عند فشل التبديل (غير ذرّي)
+  };
 
   const accept = (id) => { setOrders((a) => a.map((o) => o.id === id ? { ...o, col: "packing" } : o)); setOrderStatus(id, "packing").catch(console.error); };
   const ready = (id) => {
@@ -532,6 +727,7 @@ export default function AdminDashboard() {
               {active === "dash" && <OverviewView orders={orders} />}
               {active === "orders" && <OrdersView orders={orders} inv={inv} riders={riders} accept={accept} ready={ready} deliver={deliver} />}
               {active === "inv" && <InventoryView inv={inv} onAdjust={onAdjust} />}
+              {active === "cats" && <CategoriesView cats={cats} inv={inv} selT1={selT1} setSelT1={setSelT1} onAdd={addCat} onEdit={editCat} onDelete={removeCat} onMove={moveCat} />}
               {active === "cust" && <CustomersView customers={customers} />}
               {active === "analytics" && <AnalyticsView />}
             </>

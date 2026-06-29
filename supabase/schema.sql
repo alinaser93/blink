@@ -53,6 +53,27 @@ comment on table  public.categories is 'أقسام الكتالوج الموحّ
 comment on column public.categories.parent_category_id is 'NULL = قسم رئيسي، غير NULL = قسم فرعي';
 create index if not exists idx_categories_parent on public.categories(parent_category_id);
 
+-- ترتيب الأقسام داخل كل مجموعة (رئيسي/فرعي). آمن لإعادة التشغيل.
+-- ملاحظة: icon_url يُعاد استخدامه لتخزين أيقونة القسم بصيغة 'icon:<LucideName>'
+-- (مثل 'icon:Carrot')؛ أي قيمة أخرى (رابط/NULL) تعني "لا أيقونة مختارة" فتُشتقّ من الاسم.
+alter table public.categories add column if not exists sort_order integer not null default 0;
+comment on column public.categories.sort_order is 'ترتيب العرض داخل نفس المجموعة (أصغر = أعلى)';
+create index if not exists idx_categories_parent_sort on public.categories(parent_category_id, sort_order);
+
+-- تعبئة أولية لترتيب ثابت — تُنفَّذ مرّة واحدة فقط (لا تلمس ترتيباً عدّله المستخدم لاحقاً).
+-- الشرط: لا يوجد أي صفّ بترتيب غير افتراضي بعد؛ والفرز (created_at, id) يضمن نتيجة ثابتة.
+do $$
+begin
+  if not exists (select 1 from public.categories where sort_order <> 0) then
+    update public.categories c set sort_order = sub.rn
+    from (
+      select id, (row_number() over (partition by parent_category_id order by created_at, id) - 1) as rn
+      from public.categories
+    ) sub
+    where c.id = sub.id;
+  end if;
+end $$;
+
 
 -- =====================================================================
 --  3) PRODUCTS — المنتجات (كتالوج واحد موحّد)
