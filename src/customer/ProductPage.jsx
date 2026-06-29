@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "./cart.jsx";
+import { useCatalog } from "./catalog.js";
 import { emojiFor } from "./emoji.js";
 import {
   ChevronDown, ChevronLeft, Heart, Search, Share2, Plus, Minus, Clock, Bike, X, RefreshCcw,
@@ -48,38 +49,15 @@ const STYLE = `
 `;
 
 /* ================================================================== */
-/*  Data                                                              */
+/*  Data (ثابت عرضي فقط — تفاصيل المنتج تأتي من useCatalog)            */
 /* ================================================================== */
-const MAIN = {
-  id: 100, name: "ليمون", weight: "200 غرام", price: 1000, mrp: 1250, delivery: "17 دقيقة", brand: "فريشبري",
-  desc: "يُعرف الليمون أساساً بعصيره ورائحته القوية، بلون أصفر زاهٍ وقشرة عطرة تضيف نكهة منعشة لكل الأطباق والمشروبات.",
-  Icon: Citrus, accent: "#D9A521",
-};
-const TOP = [
-  { id: 1, name: "بصل أحمر", weight: "1 كغم", price: 1900, mrp: 2250, options: 2, recipes: 30, Icon: Cherry, accent: "#B23B6B" },
-  { id: 2, name: "فلفل أخضر حار", weight: "100 غرام", price: 650, mrp: 750, recipes: 9, Icon: Leaf, accent: "#2E9B4F" },
-  { id: 3, name: "خيار إنجليزي", weight: "500 غرام", price: 1800, mrp: 2100, recipes: 20, Icon: Salad, accent: "#2E9B4F" },
-];
-const PEOPLE = [
-  { id: 4, name: "زنجبيل طازج", weight: "200 غرام", price: 3250, mrp: 4000, Icon: Sprout, accent: "#C9923E" },
-  { id: 5, name: "جزر برتقالي", weight: "200 غرام", price: 750, mrp: 900, Icon: Carrot, accent: "#E08A2E" },
-  { id: 6, name: "طماطم هجينة", weight: "500 غرام", price: 1900, mrp: 2350, options: 2, Icon: Apple, accent: "#D33A3A" },
-  { id: 7, name: "فلفل أحمر حلو", weight: "125 غرام", price: 1200, mrp: 1500, Icon: Apple, accent: "#D33A3A" },
-  { id: 8, name: "فاصوليا خضراء", weight: "250 غرام", price: 1500, mrp: 1800, Icon: Leaf, accent: "#2E9B4F" },
-  { id: 9, name: "بطاطا", weight: "1 كغم", price: 1250, mrp: 1500, options: 2, Icon: Sprout, accent: "#C9923E" },
-];
 const RECIPES = [
-  { name: "شوربة الليمون", emoji: "🍲" }, { name: "دجاج بالليمون", emoji: "🍗" },
-  { name: "سلطة منعشة", emoji: "🥗" }, { name: "عصير ليمون", emoji: "🍋" }, { name: "كيك الليمون", emoji: "🍰" },
-];
-const BRANDS = [
-  { name: "يو بي عضوي", c: "#E08A2E" }, { name: "الأرض الخضراء", c: "#2E9B4F" },
-  { name: "مزارع شاتايوشي", c: "#5A6473" }, { name: "سول سوسايتي", c: "#D9A521" }, { name: "فريش", c: "#2B7A9B" },
+  { name: "وصفة سريعة", emoji: "🍲" }, { name: "أطباق منزلية", emoji: "🍗" },
+  { name: "سلطة منعشة", emoji: "🥗" }, { name: "عصير طازج", emoji: "🧃" }, { name: "حلى لذيذ", emoji: "🍰" },
 ];
 const FREE_AT = 15000;
 const iqd = (n) => Number(n).toLocaleString("en-US") + " د.ع";
 const clamp2 = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
-const FEED = [...TOP, ...PEOPLE];
 
 /* ================================================================== */
 /*  Rich product card (3-col feeds)                                   */
@@ -121,11 +99,15 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
   );
 }
 
-const Feed3 = ({ title, items, c }) => (
+const Feed3 = ({ title, items, c, onOpen }) => (
   <section className="px-3 pt-6">
     <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>{title}</h2>
     <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-2.5 gap-y-5">
-      {items.map((p) => <ProductCard key={p.id} p={p} qty={c.qty(p.id)} onAdd={() => c.add(p)} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} />)}
+      {items.map((p) => (
+        <div key={p.id} onClick={() => onOpen && onOpen(p)} style={{ cursor: "pointer" }}>
+          <ProductCard p={p} qty={c.qty(p.id)} onAdd={(e) => { e.stopPropagation(); c.add(p); }} onInc={(e) => { e.stopPropagation(); c.inc(p.id); }} onDec={(e) => { e.stopPropagation(); c.dec(p.id); }} />
+        </div>
+      ))}
     </div>
   </section>
 );
@@ -134,10 +116,13 @@ const Feed3 = ({ title, items, c }) => (
 /*  Product page                                                      */
 /* ================================================================== */
 export default function ProductPage() {
+  const [params] = useSearchParams();
+  const id = params.get("id");
   const [bannerOpen, setBannerOpen] = useState(true);
   const [gal, setGal] = useState(0);
   const nav = useNavigate();
   const { qty, add, inc, dec, subtotal } = useCart();
+  const { loading, products, find, byCat, tier1IdOf } = useCatalog();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(120);
@@ -146,12 +131,32 @@ export default function ProductPage() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [bannerOpen]);
+  }, [bannerOpen, loading, id]);
 
+  // المنتج الحالي من الكتالوج المشترك (مع التمرير لأعلى عند تبديل المنتج)
+  useEffect(() => { window.scrollTo(0, 0); }, [id]);
+  const main = find(id) || products[0] || null;
+
+  if (loading || !main) {
+    return (
+      <div className="qc-app min-h-screen flex flex-col items-center justify-center" dir="rtl" lang="ar">
+        <style>{STYLE}</style>
+        <p className="text-sm font-bold" style={{ color: "#9AA3AF" }}>{loading ? "جاري تحميل المنتج…" : "المنتج غير متوفّر"}</p>
+        {!loading && <button onClick={() => nav("/")} className="cta rounded-xl mt-4 text-sm font-extrabold" style={{ padding: "10px 22px" }}>العودة للرئيسية</button>}
+      </div>
+    );
+  }
+
+  const t1Id = tier1IdOf(main.categoryId);
+  const top = byCat(t1Id).filter((p) => p.id !== main.id).slice(0, 6);                 // أفضل المنتجات في نفس القسم
+  const people = products.filter((p) => tier1IdOf(p.categoryId) !== t1Id).slice(0, 6); // اشتروا أيضاً (أقسام أخرى)
   const remaining = Math.max(0, FREE_AT - subtotal);
   const c = { qty, add, inc, dec };
-  const mainQty = qty(MAIN.id);
-  const off = Math.round((1 - MAIN.price / MAIN.mrp) * 100);
+  const mainQty = qty(main.id);
+  const hasMrp = main.mrp && main.mrp > main.price;
+  const off = hasMrp ? Math.round((1 - main.price / main.mrp) * 100) : 0;
+  const desc = `${main.name} بجودة عالية ضمن قسم «${main.cat}»${main.sub ? " — " + main.sub : ""}، يوصلك بسرعة لباب البيت من سلّـة.`;
+  const openProduct = (p) => nav(`/product?id=${p.id}`);
 
   return (
     <div className="qc-app min-h-screen" dir="rtl" lang="ar">
@@ -161,17 +166,17 @@ export default function ProductPage() {
       <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F2F4" }}>
         <div className="flex items-center gap-3 px-4 py-3">
           <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ChevronDown size={20} style={{ color: "#1A1A1A" }} /></button>
-          <h1 className="flex-1 min-w-0 text-lg font-extrabold truncate" style={{ color: "#1A1A1A" }}>{MAIN.name}</h1>
+          <h1 className="flex-1 min-w-0 text-lg font-extrabold truncate" style={{ color: "#1A1A1A" }}>{main.name}</h1>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Heart size={18} style={{ color: "#1A1A1A" }} /></button>
-          <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={18} style={{ color: "#1A1A1A" }} /></button>
+          <button onClick={() => nav("/search")} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={18} style={{ color: "#1A1A1A" }} /></button>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Share2 size={17} style={{ color: "#1A1A1A" }} /></button>
         </div>
       </div>
 
       {/* ===== image gallery ===== */}
-      <div className="relative" style={{ background: (MAIN.accent || "#9AA8B5") + "14" }}>
+      <div className="relative" style={{ background: (main.accent || "#9AA8B5") + "14" }}>
         <div className="max-w-3xl mx-auto flex items-center justify-center" style={{ height: 300, fontSize: 130 }}>
-          {emojiFor(MAIN.name)}
+          {emojiFor(main.name)}
         </div>
         <div className="absolute inset-x-0 flex items-center justify-center gap-1.5" style={{ bottom: 12 }}>
           {[0, 1, 2, 3].map((i) => (
@@ -185,24 +190,25 @@ export default function ProductPage() {
         <div className="card-soft rounded-2xl p-3 flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold mb-1" style={{ color: "#7A8493" }}>الوصف</p>
-            <p className="text-sm leading-snug" style={{ ...clamp2, color: "#2A2F36" }}>{MAIN.desc}</p>
+            <p className="text-sm leading-snug" style={{ ...clamp2, color: "#2A2F36" }}>{desc}</p>
           </div>
           <button className="vdetails rounded-xl text-xs font-extrabold shrink-0 leading-tight" style={{ padding: "10px 12px" }}>عرض<br />التفاصيل</button>
         </div>
 
         <div className="card-soft rounded-2xl p-4">
-          <div className="inline-flex items-center gap-1 rounded-md mb-2" style={{ background: "#fff", padding: "3px 8px" }}><Clock size={13} style={{ color: "#5A6473" }} /><span className="text-xs font-bold" style={{ color: "#5A6473" }}>{MAIN.delivery}</span></div>
-          <h2 className="text-xl font-extrabold" style={{ color: "#1A1A1A" }}>{MAIN.name}</h2>
-          <p className="text-sm font-semibold mt-0.5" style={{ color: "#5A6473" }}>{MAIN.weight}</p>
+          <div className="inline-flex items-center gap-1 rounded-md mb-2" style={{ background: "#fff", padding: "3px 8px" }}><Clock size={13} style={{ color: "#5A6473" }} /><span className="text-xs font-bold" style={{ color: "#5A6473" }}>17 دقيقة</span></div>
+          <h2 className="text-xl font-extrabold" style={{ color: "#1A1A1A" }}>{main.name}</h2>
+          <p className="text-sm font-semibold mt-0.5" style={{ color: "#5A6473" }}>{main.weight}</p>
           <div className="flex items-baseline gap-2 mt-1.5">
-            <span className="text-xl font-extrabold" style={{ color: "#1A1A1A" }}>{iqd(MAIN.price)}</span>
-            <span className="text-sm" style={{ color: "#9AA3AF" }}>MRP <span className="line-through">{iqd(MAIN.mrp)}</span></span>
+            <span className="text-xl font-extrabold" style={{ color: "#1A1A1A" }}>{iqd(main.price)}</span>
+            {hasMrp && <span className="text-sm" style={{ color: "#9AA3AF" }}>MRP <span className="line-through">{iqd(main.mrp)}</span></span>}
+            {off > 0 && <span className="text-xs font-extrabold rounded-md px-2 py-0.5" style={{ background: "#EAF6EC", color: "#0C831F" }}>خصم {off}%</span>}
           </div>
         </div>
 
-        <div className="linkrow rounded-2xl px-3 py-3 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#2E9B4F" }}><span className="text-white font-extrabold">ف</span></div>
-          <div className="flex-1 min-w-0"><p className="text-base font-extrabold" style={{ color: "#1A1A1A" }}>{MAIN.brand}</p><p className="text-xs" style={{ color: "#7A8493" }}>تصفّح كل المنتجات</p></div>
+        <div onClick={() => t1Id && nav(`/category?cat=${t1Id}`)} className="linkrow rounded-2xl px-3 py-3 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: (main.accent || "#2E9B4F"), fontSize: 22 }}>{emojiFor(main.cat)}</div>
+          <div className="flex-1 min-w-0"><p className="text-base font-extrabold" style={{ color: "#1A1A1A" }}>{main.cat}</p><p className="text-xs" style={{ color: "#7A8493" }}>تصفّح كل منتجات القسم</p></div>
           <ChevronLeft size={20} style={{ color: "#9AA3AF" }} />
         </div>
 
@@ -213,8 +219,8 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* ===== top products ===== */}
-      <Feed3 title="أفضل المنتجات في هذا القسم" items={TOP} c={c} />
+      {/* ===== top products in category ===== */}
+      {top.length > 0 && <Feed3 title="أفضل المنتجات في هذا القسم" items={top} c={c} onOpen={openProduct} />}
 
       {/* ===== recipes ===== */}
       <section className="px-3 pt-6">
@@ -229,21 +235,8 @@ export default function ProductPage() {
         </div>
       </section>
 
-      {/* ===== brands in category ===== */}
-      <section className="px-3 pt-6">
-        <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>ماركات في هذا القسم</h2>
-        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-          {BRANDS.map((b) => (
-            <div key={b.name} className="shrink-0 flex flex-col items-center gap-1.5" style={{ width: 84 }}>
-              <div className="brand-card rounded-2xl flex items-center justify-center" style={{ width: 80, height: 80 }}><span className="font-extrabold text-lg" style={{ color: b.c }}>{b.name.slice(0, 2)}</span></div>
-              <span className="text-xs font-bold text-center leading-tight" style={{ color: "#3A424E" }}>{b.name}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* ===== people also bought ===== */}
-      <Feed3 title="اشتروا أيضاً" items={PEOPLE} c={c} />
+      {people.length > 0 && <Feed3 title="اشتروا أيضاً" items={people} c={c} onOpen={openProduct} />}
 
       {/* spacer */}
       <div style={{ height: bottomH + 8 }} />
@@ -270,20 +263,20 @@ export default function ProductPage() {
         <div className="bottombar">
           <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-bold" style={{ color: "#1A1A1A" }}>{MAIN.weight}</p>
+              <p className="text-sm font-bold" style={{ color: "#1A1A1A" }}>{main.weight}</p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-base font-extrabold" style={{ color: "#1A1A1A" }}>{iqd(MAIN.price)}</span>
-                <span className="text-xs" style={{ color: "#9AA3AF" }}>MRP <span className="line-through">{iqd(MAIN.mrp)}</span></span>
+                <span className="text-base font-extrabold" style={{ color: "#1A1A1A" }}>{iqd(main.price)}</span>
+                {hasMrp && <span className="text-xs" style={{ color: "#9AA3AF" }}>MRP <span className="line-through">{iqd(main.mrp)}</span></span>}
               </div>
               <p className="text-xs" style={{ color: "#9AA3AF" }}>شامل كل الضرائب</p>
             </div>
             {mainQty === 0 ? (
-              <button onClick={() => { add(MAIN); nav("/cart"); }} className="cta rounded-xl text-base font-extrabold shrink-0" style={{ padding: "13px 30px" }}>أضف إلى السلة</button>
+              <button onClick={() => { add(main); nav("/cart"); }} className="cta rounded-xl text-base font-extrabold shrink-0" style={{ padding: "13px 30px" }}>أضف إلى السلة</button>
             ) : (
               <div className="stepper rounded-xl overflow-hidden flex items-center shrink-0">
-                <button onClick={() => dec(MAIN.id)} className="stepper-btn" style={{ padding: "13px 16px" }}><Minus size={18} strokeWidth={2.8} /></button>
+                <button onClick={() => dec(main.id)} className="stepper-btn" style={{ padding: "13px 16px" }}><Minus size={18} strokeWidth={2.8} /></button>
                 <span className="text-base font-extrabold" style={{ width: 32, textAlign: "center" }}>{mainQty}</span>
-                <button onClick={() => inc(MAIN.id)} className="stepper-btn" style={{ padding: "13px 16px" }}><Plus size={18} strokeWidth={2.8} /></button>
+                <button onClick={() => inc(main.id)} className="stepper-btn" style={{ padding: "13px 16px" }}><Plus size={18} strokeWidth={2.8} /></button>
               </div>
             )}
           </div>

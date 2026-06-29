@@ -1,11 +1,19 @@
 import { supabase, isLive } from "./supabase.js";
-import { ICON_MAP, MOCK_PRODUCTS, MOCK_ORDERS, MOCK_CUSTOMERS, MOCK_RIDERS } from "./mockData.js";
+import { ICON_MAP, MOCK_PRODUCTS, MOCK_CATEGORIES as SEED_CATEGORIES, MOCK_ORDERS, MOCK_CUSTOMERS, MOCK_RIDERS } from "./mockData.js";
 
 export { isLive, ICON_MAP };
 
-// سكيمة بلينكِت تخزّن image_url (لا اسم أيقونة) -> نشتقّ أيقونة + لون من القسم
-export const CAT_ICON   = { "خضار وفواكه": "Carrot", "ألبان": "Milk", "مشروبات": "CupSoda", "بقالة": "Wheat", "سناكس": "Popcorn" };
-export const CAT_ACCENT = { "خضار وفواكه": "#D33A3A", "ألبان": "#2B7A9B", "مشروبات": "#23306E", "بقالة": "#9A6B2E", "سناكس": "#E0A21F" };
+// سكيمة بلينكِت تخزّن image_url (لا اسم أيقونة) -> نشتقّ أيقونة + لون من القسم الرئيسي (tier1)
+export const CAT_ICON = {
+  "خضار وفواكه": "Carrot", "ألبان وبيض وخبز": "Milk", "مشروبات وعصائر": "CupSoda",
+  "سناكس وحلويات": "Popcorn", "بقالة وأساسيات": "Wheat", "وجبات سريعة ومعلّبات": "Coffee",
+  "العناية والجمال": "Droplet", "أساسيات المنزل": "Package",
+};
+export const CAT_ACCENT = {
+  "خضار وفواكه": "#D33A3A", "ألبان وبيض وخبز": "#2B7A9B", "مشروبات وعصائر": "#23306E",
+  "سناكس وحلويات": "#E0A21F", "بقالة وأساسيات": "#9A6B2E", "وجبات سريعة ومعلّبات": "#C9692E",
+  "العناية والجمال": "#C2477F", "أساسيات المنزل": "#5A6473",
+};
 
 // الأيقونات المتاحة لاختيار أيقونة القسم (مفاتيح ICON_MAP)
 export const CATEGORY_ICONS = Object.keys(ICON_MAP);
@@ -13,35 +21,25 @@ export const CATEGORY_ICONS = Object.keys(ICON_MAP);
 // icon_url يُعاد استخدامه: 'icon:<اسم>' = أيقونة lucide مختارة؛ غير ذلك (رابط/NULL) = لا أيقونة مختارة
 const parseIconName = (s) => (typeof s === "string" && s.startsWith("icon:")) ? s.slice(5) : null;
 
-// أقسام تجريبية (عند عدم الاتصال بـ Supabase) — قابلة للتعديل ضمن الجلسة، مطابقة لشكل seed
-let MOCK_CATEGORIES = [
-  { id: "c1", name: "بقالة",        parentId: null, iconName: "Wheat",   sort: 0 },
-  { id: "c2", name: "خضار وفواكه",  parentId: null, iconName: "Carrot",  sort: 1 },
-  { id: "c3", name: "مشروبات",      parentId: null, iconName: "CupSoda", sort: 2 },
-  { id: "c4", name: "ألبان",        parentId: null, iconName: "Milk",    sort: 3 },
-  { id: "c5", name: "سناكس",        parentId: null, iconName: "Popcorn", sort: 4 },
-  { id: "c6", name: "فواكه",        parentId: "c2", iconName: null,      sort: 0 },
-  { id: "c7", name: "خضروات",       parentId: "c2", iconName: null,      sort: 1 },
-  { id: "c8", name: "معلّبات",      parentId: "c1", iconName: null,      sort: 0 },
-];
+// أقسام تجريبية (عند عدم الاتصال بـ Supabase) — نسخة قابلة للتعديل ضمن الجلسة من شجرة الكتالوج المشتركة
+let MOCK_CATEGORIES = SEED_CATEGORIES.map((c) => ({ ...c }));
 
 // image_url يُعاد استخدامه لإيموجي المنتج بصيغة 'emoji:<e>'
 const parseEmoji = (s) => (typeof s === "string" && s.startsWith("emoji:")) ? s.slice(6) : null;
 
-// خريطة اسم القسم الرئيسي -> معرّفه (لربط المنتجات التجريبية بقسمها)
-const T1_ID = MOCK_CATEGORIES.reduce((m, c) => { if (c.parentId == null) m[c.name] = c.id; return m; }, {});
-
-// منتجات تجريبية قابلة للتعديل ضمن الجلسة، مربوطة بمعرّف قسم/تفرّع (categoryId)
+// منتجات تجريبية قابلة للتعديل ضمن الجلسة، مربوطة بمعرّف قسم/تفرّع (categoryId) مباشرةً
 let MOCK_PRODUCTS_STORE = MOCK_PRODUCTS.map((p) => ({
-  id: p.id, name: p.name, price: p.price, stock: p.stock,
-  categoryId: T1_ID[p.cat] || null, weight: p.weight || "", mrp: p.mrp || 0, emoji: null, accent: p.accent || "#0C831F",
+  id: p.id, name: p.name, price: p.price, stock: p.stock, categoryId: p.categoryId || null,
+  weight: p.weight || "", mrp: p.mrp || 0, emoji: null, rating: p.rating || null, reviews: p.reviews || null,
 }));
 
-// يحوّل صفّ منتج تجريبي إلى الشكل الموحّد (مع اسم القسم المباشر)
+// يحوّل صفّ منتج تجريبي إلى الشكل الموحّد: cat=اسم القسم الرئيسي، sub=اسم التفرّع (إن وُجد)
 const resolveMockProduct = (p) => {
   const c = MOCK_CATEGORIES.find((x) => x.id === p.categoryId);
-  const cat = c ? c.name : "أخرى";
-  return { ...p, cat, Icon: ICON_MAP[CAT_ICON[cat]] || ICON_MAP.Package };
+  const t1 = c ? (c.parentId == null ? c : MOCK_CATEGORIES.find((x) => x.id === c.parentId)) : null;
+  const cat = t1 ? t1.name : "أخرى";
+  const sub = c && c.parentId != null ? c.name : null;
+  return { ...p, cat, sub, subId: sub ? c.id : null, Icon: ICON_MAP[CAT_ICON[cat]] || ICON_MAP.Package, accent: CAT_ACCENT[cat] || "#9AA8B5" };
 };
 
 // عمود الكانبان  <->  حالة الطلب في قاعدة البيانات
@@ -60,13 +58,17 @@ const relAr = (iso) => {
 };
 const shortNum = (uuid) => "#" + String(uuid).replace(/-/g, "").slice(0, 4).toUpperCase();
 
-const PROD_COLS = "id,name,price_iqd,stock_quantity,mrp_iqd,category_id,weight_label,image_url,internal_supplier_name,categories(name)";
+const PROD_COLS = "id,name,price_iqd,stock_quantity,mrp_iqd,category_id,weight_label,image_url,internal_supplier_name,categories(id,name,parent_category_id,parent:parent_category_id(name))";
 const mapProduct = (r) => {
-  const cat = (r.categories && r.categories.name) || "أخرى";
+  const c = r.categories || null;
+  const isSub = !!(c && c.parent_category_id != null);
+  const cat = isSub ? ((c.parent && c.parent.name) || "أخرى") : ((c && c.name) || "أخرى");
+  const sub = isSub ? c.name : null;
   return {
     id: r.id, name: r.name, price: r.price_iqd, stock: r.stock_quantity,
     mrp: r.mrp_iqd || 0, weight: r.weight_label || "", categoryId: r.category_id,
-    emoji: parseEmoji(r.image_url), cat, supplier: r.internal_supplier_name || "",
+    emoji: parseEmoji(r.image_url), cat, sub, subId: isSub ? c.id : null,
+    supplier: r.internal_supplier_name || "",
     Icon: ICON_MAP[CAT_ICON[cat]] || ICON_MAP.Package, accent: CAT_ACCENT[cat] || "#0C831F",
   };
 };

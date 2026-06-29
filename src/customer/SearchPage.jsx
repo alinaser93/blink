@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "./cart.jsx";
+import { useCatalog } from "./catalog.js";
 import { emojiFor } from "./emoji.js";
 import {
   ArrowRight, X, Mic, Search, Clock, TrendingUp, ChevronDown, ChevronLeft,
@@ -45,21 +46,7 @@ const STYLE = `
 /*  Data                                                              */
 /* ================================================================== */
 const TRENDING = ["سكر", "حليب", "خبز", "بيبسي", "شيبس", "موز", "بيض", "شاي", "قهوة", "ماء"];
-const RECENT = ["سكر بني", "حليب قليل الدسم", "ماء معدني"];
-const SUGGEST_POOL = ["سكر", "سكر بني", "سكر دايت", "آيس كريم خالٍ من السكر", "سكر خالٍ من الكبريت", "بسكويت دايت", "مشروبات بدون سكر", "سكر بودرة"];
-
-const RESULTS = [
-  { id: 1, name: "سكر بني عضوي - حبوب كاملة", weight: "1 كغم", price: 3000, mrp: 4750, unit: "300 د.ع/100غ", rating: "4.4", reviews: "3.8 ألف", Icon: Wheat, accent: "#9A6B2E" },
-  { id: 2, name: "سكر بني طبيعي", weight: "1 كغم", price: 3250, mrp: 4000, unit: "325 د.ع/100غ", rating: "4.5", reviews: "4.2 ألف", Icon: Wheat, accent: "#9A6B2E" },
-  { id: 3, name: "سكر خام / خاندساري", weight: "500 غرام", price: 3000, mrp: 3650, unit: "600 د.ع/100غ", options: 2, rating: "4.5", reviews: "8.2 ألف", stock: 3, Icon: Wheat, accent: "#C9923E" },
-  { id: 4, name: "سكر أبيض ناعم مكرر", weight: "1 كغم", price: 2750, mrp: 3250, unit: "275 د.ع/100غ", rating: "4.4", reviews: "270 ألف", Icon: Wheat, accent: "#B0B7C0" },
-  { id: 5, name: "سكر خالٍ من الكبريت", weight: "1 كغم", price: 2750, mrp: 3000, options: 2, rating: "4.5", reviews: "350 ألف", Icon: Wheat, accent: "#2E9B4F" },
-  { id: 6, name: "مسحوق سكر بودرة", weight: "500 غرام", price: 2000, rating: "4.5", reviews: "5 ألف", Icon: Wheat, accent: "#B0B7C0" },
-];
-const BRANDS = [
-  { name: "الحبوب الكاملة", c: "#2E9B4F" }, { name: "أوتام سكر", c: "#23306E" },
-  { name: "فورتشن", c: "#E0552E" }, { name: "مادهور", c: "#D33A3A" }, { name: "نقاء", c: "#2B7A9B" },
-];
+const RECENT = ["حليب طازج", "ماء معدني", "موز"];
 const FILTERS = [
   { label: "فلاتر", Icon: SlidersHorizontal }, { label: "ترتيب", Icon: ArrowUpDown },
   { label: "الكمية" }, { label: "السعر" },
@@ -126,6 +113,7 @@ export default function SearchPage() {
   const inputRef = useRef(null);
   const nav = useNavigate();
   const { qty, add, inc, dec, subtotal } = useCart();
+  const { products, tier1 } = useCatalog();
 
   useEffect(() => { inputRef.current && inputRef.current.focus(); }, []);
 
@@ -134,12 +122,20 @@ export default function SearchPage() {
   const go = (term) => { setQuery(term); setSubmitted(true); };
   const onType = (e) => { setQuery(e.target.value); setSubmitted(false); };
   const clearQ = () => { setQuery(""); setSubmitted(false); inputRef.current && inputRef.current.focus(); };
+  const openProduct = (p) => nav(`/product?id=${p.id}`);
 
-  const suggestions = (() => {
-    const base = SUGGEST_POOL.filter((s) => s.includes(query));
-    const out = base.length ? base : [query, ...SUGGEST_POOL.slice(0, 5)];
-    return out.slice(0, 8);
-  })();
+  // نتائج فعلية من الكتالوج المشترك (بحث بالاسم/القسم/التفرّع)
+  const q = query.trim();
+  const results = useMemo(() => {
+    if (!q) return [];
+    return products.filter((p) => p.name.includes(q) || (p.cat && p.cat.includes(q)) || (p.sub && p.sub.includes(q)));
+  }, [q, products]);
+  const suggestions = useMemo(() => {
+    const names = products.map((p) => p.name);
+    const base = q ? names.filter((n) => n.includes(q)) : [];
+    const out = base.length ? base : [q, ...TRENDING].filter(Boolean);
+    return Array.from(new Set(out)).slice(0, 8);
+  }, [q, products]);
 
   return (
     <div className="qc-app min-h-screen" dir="rtl" lang="ar">
@@ -170,26 +166,42 @@ export default function SearchPage() {
           </div>
 
           <section className="px-3 pt-4">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{RESULTS.slice(0, 4).map((p) => <ProductCard key={p.id} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
-          </section>
-
-          <section className="px-3 pt-6">
-            <div className="rounded-2xl p-4" style={{ background: "#FBF4E7" }}>
-              <h2 className="text-lg font-extrabold mb-3" style={{ color: "#1A1A1A" }}>تسوّق حسب الماركة</h2>
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-                {BRANDS.map((b) => (
-                  <div key={b.name} className="shrink-0 flex flex-col items-center gap-1.5" style={{ width: 80 }}>
-                    <div className="brand-card rounded-2xl flex items-center justify-center" style={{ width: 76, height: 76 }}><span className="font-extrabold text-lg" style={{ color: b.c }}>{b.name.slice(0, 2)}</span></div>
-                    <span className="text-xs font-bold text-center leading-tight" style={{ color: "#3A424E" }}>{b.name}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="flex items-baseline justify-between mb-3 px-0.5">
+              <h2 className="text-base font-extrabold" style={{ color: "#1A1A1A" }}>نتائج «{query}»</h2>
+              <span className="text-sm font-semibold" style={{ color: "#9AA3AF" }}>{results.length} منتج</span>
             </div>
+            {results.length === 0 ? (
+              <p className="text-center text-sm py-12" style={{ color: "#AEB6BF" }}>لا توجد نتائج مطابقة — جرّب كلمة أخرى</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5">{results.slice(0, 4).map((p) => (
+                <div key={p.id} onClick={() => openProduct(p)} style={{ cursor: "pointer" }}><ProductCard p={p} qty={qty(p.id)} onAdd={(e) => { e.stopPropagation(); add(p); }} onInc={(e) => { e.stopPropagation(); inc(p.id); }} onDec={(e) => { e.stopPropagation(); dec(p.id); }} /></div>
+              ))}</div>
+            )}
           </section>
 
-          <section className="px-3 pt-6">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{RESULTS.slice(4).concat(RESULTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
-          </section>
+          {tier1.length > 0 && (
+            <section className="px-3 pt-6">
+              <div className="rounded-2xl p-4" style={{ background: "#FBF4E7" }}>
+                <h2 className="text-lg font-extrabold mb-3" style={{ color: "#1A1A1A" }}>تصفّح الأقسام</h2>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                  {tier1.map((c) => (
+                    <button key={c.id} onClick={() => nav(`/category?cat=${c.id}`)} className="shrink-0 flex flex-col items-center gap-1.5" style={{ width: 80 }}>
+                      <div className="brand-card rounded-2xl flex items-center justify-center" style={{ width: 76, height: 76, fontSize: 34 }}>{emojiFor(c.name)}</div>
+                      <span className="text-xs font-bold text-center leading-tight" style={{ color: "#3A424E" }}>{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {results.length > 4 && (
+            <section className="px-3 pt-6">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5">{results.slice(4).map((p) => (
+                <div key={p.id} onClick={() => openProduct(p)} style={{ cursor: "pointer" }}><ProductCard p={p} qty={qty(p.id)} onAdd={(e) => { e.stopPropagation(); add(p); }} onInc={(e) => { e.stopPropagation(); inc(p.id); }} onDec={(e) => { e.stopPropagation(); dec(p.id); }} /></div>
+              ))}</div>
+            </section>
+          )}
 
           <div style={{ height: 90 }} />
         </>

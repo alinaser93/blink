@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "./cart.jsx";
+import { useCatalog } from "./catalog.js";
 import { emojiFor } from "./emoji.js";
 import {
   ArrowRight, Search, Share2, ChevronDown, ChevronLeft, SlidersHorizontal, ArrowUpDown,
@@ -42,21 +43,8 @@ const STYLE = `
 `;
 
 /* ================================================================== */
-/*  Data                                                              */
+/*  Data (ثابت عرضي فقط — الكتالوج يأتي من useCatalog)                 */
 /* ================================================================== */
-const CATEGORY = "خضار وفواكه";
-const SUBCATS = [
-  { name: "الكل", Icon: ShoppingBasket },
-  { name: "خضار طازجة", Icon: Carrot },
-  { name: "فواكه طازجة", Icon: Apple },
-  { name: "مستورد", Icon: Grape },
-  { name: "كزبرة وأعشاب", Icon: Leaf },
-  { name: "مقطّعة وبراعم", Icon: Salad },
-  { name: "عضوية موثوقة", Icon: Sprout },
-  { name: "زهور وأوراق", Icon: Flower2 },
-  { name: "موسمية", Icon: Cherry },
-  { name: "خضار مجمّدة", Icon: Snowflake },
-];
 const FILTERS = [
   { label: "فلاتر", Icon: SlidersHorizontal },
   { label: "ترتيب", Icon: ArrowUpDown },
@@ -64,32 +52,10 @@ const FILTERS = [
   { label: "السعر" },
 ];
 
-const SEASONAL = [
-  { id: 11, name: "مانجو صفدا / بنغنابالي", weight: "600 غرام", price: 6000, mrp: 7400, rating: "4.5", reviews: "3 ألف", tags: ["خالٍ من الكربيد", "حلو غني باللب"], badge: { t: "الأفضل بالموسم", c: "#7A5A2E" }, Icon: Apple, accent: "#D9A521" },
-  { id: 12, name: "ليتشي طازجة", weight: "500 غرام", price: 10300, mrp: 12450, rating: "4.4", reviews: "2 ألف", badge: { t: "الأفضل بالموسم", c: "#7A5A2E" }, Icon: Cherry, accent: "#C2477F" },
-  { id: 13, name: "جامون أسود طازج", weight: "250 غرام", price: 4200, mrp: 4850, rating: "4.3", reviews: "1 ألف", badge: { t: "الأفضل بالموسم", c: "#7A5A2E" }, Icon: Grape, accent: "#6B3FA0" },
-  { id: 14, name: "كرز أحمر مستورد", weight: "200 غرام", price: 7450, mrp: 9350, rating: "4.5", reviews: "900", badge: { t: "مستورد", c: "#6B3FA0" }, Icon: Cherry, accent: "#C24747" },
-];
-
-const PRODUCTS = [
-  { id: 1, name: "بازلاء خضراء مجمّدة", weight: "500 غرام", price: 5750, mrp: 6750, rating: "4.5", reviews: "63 ألف", pill: "مجمّد", options: 2, badge: { t: "باكيت جديد", c: "#1A7A33" }, Icon: Snowflake, accent: "#2E9B4F" },
-  { id: 2, name: "ذرة حلوة مجمّدة", weight: "500 غرام", price: 4250, mrp: 5000, rating: "4.5", reviews: "38 ألف", pill: "مجمّد", badge: { t: "باكيت جديد", c: "#1A7A33" }, Icon: Snowflake, accent: "#D9A521" },
-  { id: 3, name: "بازلاء خضراء فاخرة مجمّدة", weight: "500 غرام", price: 4100, mrp: 8450, rating: "4.4", reviews: "12 ألف", pill: "مجمّد", Icon: Snowflake, accent: "#2E9B4F" },
-  { id: 4, name: "خضار مشكّلة مجمّدة", weight: "500 غرام", price: 3650, mrp: 4250, rating: "4.3", reviews: "9 ألف", pill: "مجمّد", badge: { t: "باكيت جديد", c: "#1A7A33" }, Icon: Snowflake, accent: "#C9692E" },
-  { id: 5, name: "فاصوليا خضراء مجمّدة", weight: "400 غرام", price: 3000, rating: "4.2", reviews: "5 ألف", pill: "مجمّد", options: 2, Icon: Snowflake, accent: "#2E9B4F" },
-  { id: 6, name: "بروكلي مجمّد", weight: "400 غرام", price: 4500, mrp: 5500, rating: "4.5", reviews: "7 ألف", pill: "مجمّد", Icon: Snowflake, accent: "#1F9B6B" },
-];
-
-const BRANDS = [
-  { name: "أمول", c: "#D33A3A" }, { name: "عضوي", c: "#2E9B4F" }, { name: "كابيفا", c: "#1A1A1A" },
-  { name: "بيور", c: "#B8860B" }, { name: "نقاء", c: "#2B7A9B" },
-];
-
 const ADDR = "السماوة، شارع الكورنيش";
 const FREE_AT = 15000;
 const iqd = (n) => Number(n).toLocaleString("en-US") + " د.ع";
 const clamp2 = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
-const ALL = [...SEASONAL, ...PRODUCTS];
 
 /* ================================================================== */
 /*  Rich product card                                                 */
@@ -151,11 +117,24 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
 /*  Category page                                                     */
 /* ================================================================== */
 export default function CategoryPage() {
-  const [activeSub, setActiveSub] = useState("الكل");
-  const [bannerOpen, setBannerOpen] = useState(true);
+  const [params] = useSearchParams();
+  const catParam = params.get("cat");
   const nav = useNavigate();
   const { qty, add, inc, dec, subtotal } = useCart();
+  const { loading, tier1, subsOf, byCat, bySub, catById } = useCatalog();
 
+  // القسم الرئيسي الحالي: من الباراميتر (سواء أشار لقسم رئيسي أو تفرّع) وإلا أول قسم
+  const paramCat = catById(catParam);
+  const current = paramCat ? (paramCat.parentId == null ? paramCat : catById(paramCat.parentId)) : tier1[0];
+  const subs = current ? subsOf(current.id) : [];
+
+  const [activeSub, setActiveSub] = useState("الكل");
+  // عند تغيّر القسم: إن أشار الباراميتر لتفرّع فعّله، وإلا «الكل»
+  useEffect(() => {
+    setActiveSub(paramCat && paramCat.parentId != null ? paramCat.id : "الكل");
+  }, [catParam, current && current.id]);
+
+  const [bannerOpen, setBannerOpen] = useState(true);
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(70);
   useEffect(() => {
@@ -163,11 +142,15 @@ export default function CategoryPage() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [bannerOpen]);
+  }, [bannerOpen, loading]);
 
+  const rows = current ? (activeSub === "الكل" ? byCat(current.id) : bySub(activeSub)) : [];
+  const others = tier1.filter((c) => !current || c.id !== current.id);
   const remaining = Math.max(0, FREE_AT - subtotal);
+  const subLabel = activeSub === "الكل" ? "كل المنتجات" : (catById(activeSub)?.name || "");
+
   const card = (p) => (
-    <div key={p.id} onClick={() => nav("/product")} style={{ cursor: "pointer" }}>
+    <div key={p.id} onClick={() => nav(`/product?id=${p.id}`)} style={{ cursor: "pointer" }}>
       <ProductCard p={p} qty={qty(p.id)} onAdd={(e) => { e.stopPropagation(); add(p); }} onInc={(e) => { e.stopPropagation(); inc(p.id); }} onDec={(e) => { e.stopPropagation(); dec(p.id); }} />
     </div>
   );
@@ -181,14 +164,14 @@ export default function CategoryPage() {
         <div className="flex items-center gap-3 px-4 py-3">
           <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} style={{ color: "#1A1A1A" }} /></button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-extrabold leading-tight truncate" style={{ color: "#1A1A1A" }}>{CATEGORY}</h1>
+            <h1 className="text-xl font-extrabold leading-tight truncate" style={{ color: "#1A1A1A" }}>{current ? current.name : "الأقسام"}</h1>
             <div className="flex items-center gap-1 mt-0.5">
               <span className="text-sm font-bold" style={{ color: "#0C831F" }}>التوصيل إلى البيت:</span>
               <span className="text-sm truncate" style={{ color: "#5A6473", maxWidth: "42vw" }}>{ADDR}</span>
               <ChevronDown size={15} style={{ color: "#5A6473" }} />
             </div>
           </div>
-          <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={19} style={{ color: "#1A1A1A" }} /></button>
+          <button onClick={() => nav("/search")} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={19} style={{ color: "#1A1A1A" }} /></button>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Share2 size={18} style={{ color: "#1A1A1A" }} /></button>
         </div>
       </div>
@@ -197,12 +180,12 @@ export default function CategoryPage() {
       <div className="flex">
         {/* sub-category rail (right in RTL) */}
         <div className="no-scrollbar shrink-0" style={{ position: "sticky", top: 0, alignSelf: "flex-start", width: 86, maxHeight: "100dvh", overflowY: "auto", background: "#fff", borderInlineEnd: "1px solid #F1F2F4", paddingBottom: 90 }}>
-          {SUBCATS.map((s) => {
-            const on = activeSub === s.name;
+          {[{ id: "الكل", name: "الكل" }, ...subs].map((s) => {
+            const on = activeSub === s.id;
             return (
-              <button key={s.name} onClick={() => setActiveSub(s.name)} className="rail-item relative w-full flex flex-col items-center gap-1 py-3 px-1">
+              <button key={s.id} onClick={() => setActiveSub(s.id)} className="rail-item relative w-full flex flex-col items-center gap-1 py-3 px-1">
                 {on && <span style={{ position: "absolute", insetInlineEnd: 0, top: 10, bottom: 10, width: 4, borderRadius: 4, background: "#0C831F" }} />}
-                <div className="rounded-full flex items-center justify-center" style={{ width: 54, height: 54, background: on ? "#E8F5EA" : "#F4F6F9" }}><s.Icon size={26} strokeWidth={1.8} style={{ color: on ? "#0C831F" : "#6B7480" }} /></div>
+                <div className="rounded-full flex items-center justify-center" style={{ width: 54, height: 54, background: on ? "#E8F5EA" : "#F4F6F9", fontSize: 26 }}>{s.id === "الكل" ? "🧺" : emojiFor(s.name)}</div>
                 <span className="text-xs text-center leading-tight" style={{ fontWeight: on ? 800 : 600, color: on ? "#1A1A1A" : "#5A6473" }}>{s.name}</span>
               </button>
             );
@@ -222,48 +205,37 @@ export default function CategoryPage() {
             </div>
           </div>
 
-          {/* seasonal collection block */}
-          <div className="px-3 pt-4">
-            <div className="rounded-2xl overflow-hidden" style={{ background: "#EAF6EA" }}>
-              <div className="flex items-center justify-between gap-2 px-4 pt-4">
-                <div className="min-w-0">
-                  <h2 className="text-lg font-extrabold leading-tight" style={{ color: "#1A1A1A" }}>فواكه الموسم الطازجة</h2>
-                  <p className="text-xs font-semibold mt-0.5" style={{ color: "#5A6473" }}>قيمة غذائية بكل قضمة</p>
+          {/* product grid */}
+          <section className="px-3 pt-4">
+            <div className="flex items-baseline justify-between mb-3 px-0.5">
+              <h2 className="text-lg font-extrabold" style={{ color: "#1A1A1A" }}>{subLabel}</h2>
+              <span className="text-sm font-semibold" style={{ color: "#9AA3AF" }}>{rows.length} منتج</span>
+            </div>
+            {loading ? (
+              <p className="text-center text-sm py-12" style={{ color: "#AEB6BF" }}>جاري التحميل…</p>
+            ) : rows.length === 0 ? (
+              <p className="text-center text-sm py-12" style={{ color: "#AEB6BF" }}>لا توجد منتجات في هذا التصنيف بعد</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5">{rows.map(card)}</div>
+            )}
+          </section>
+
+          {/* shop by other categories */}
+          {others.length > 0 && (
+            <section className="px-3 pt-6">
+              <div className="rounded-2xl p-4" style={{ background: "#FBF4E7" }}>
+                <h2 className="text-lg font-extrabold mb-3" style={{ color: "#1A1A1A" }}>تصفّح أقساماً أخرى</h2>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                  {others.map((c) => (
+                    <button key={c.id} onClick={() => nav(`/category?cat=${c.id}`)} className="shrink-0 flex flex-col items-center gap-1.5" style={{ width: 80 }}>
+                      <div className="brand-card rounded-2xl flex items-center justify-center" style={{ width: 76, height: 76, fontSize: 36 }}>{emojiFor(c.name)}</div>
+                      <span className="text-xs font-bold text-center leading-tight" style={{ color: "#3A424E" }}>{c.name}</span>
+                    </button>
+                  ))}
                 </div>
-                <span style={{ fontSize: 40 }}>🧺</span>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-5 p-3 pt-3">{SEASONAL.map(card)}</div>
-            </div>
-          </div>
-
-          {/* main grid */}
-          <section className="px-3 pt-6">
-            <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>خضار مجمّدة</h2>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{PRODUCTS.slice(0, 4).map(card)}</div>
-          </section>
-
-          {/* shop by brands */}
-          <section className="px-3 pt-6">
-            <div className="rounded-2xl p-4" style={{ background: "#FBF4E7" }}>
-              <h2 className="text-lg font-extrabold mb-3" style={{ color: "#1A1A1A" }}>تسوّق حسب الماركة</h2>
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-                {BRANDS.map((b) => (
-                  <div key={b.name} className="shrink-0 flex flex-col items-center gap-1.5" style={{ width: 76 }}>
-                    <div className="brand-card rounded-2xl flex items-center justify-center" style={{ width: 72, height: 72 }}>
-                      <span className="font-extrabold text-lg" style={{ color: b.c }}>{b.name.slice(0, 2)}</span>
-                    </div>
-                    <span className="text-xs font-bold text-center" style={{ color: "#3A424E" }}>{b.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* more */}
-          <section className="px-3 pt-6">
-            <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>وصل حديثاً</h2>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5">{PRODUCTS.slice(4).concat(PRODUCTS.slice(0, 2)).map((p, i) => <ProductCard key={"m" + p.id + i} p={p} qty={qty(p.id)} onAdd={() => add(p)} onInc={() => inc(p.id)} onDec={() => dec(p.id)} />)}</div>
-          </section>
+            </section>
+          )}
         </div>
       </div>
 
