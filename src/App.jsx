@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route, Outlet } from "react-router-dom";
-import { CartProvider } from "./customer/cart.jsx";
+import { CartProvider, useCart } from "./customer/cart.jsx";
+import CartBar from "./customer/CartBar.jsx";
 
 import HomePage from "./customer/HomePage.jsx";
 import CategoryPage from "./customer/CategoryPage.jsx";
@@ -12,11 +13,23 @@ import OrderTrackingScreen from "./customer/OrderTrackingScreen.jsx";
 import AdminDashboard from "./admin/AdminDashboard.jsx";
 import RiderApp from "./rider/RiderApp.jsx";
 
+// قشرة الزبون: السلّة اللاصقة العامة + إخفاء بانر التوصيل القديم عند امتلاء السلة
+function CustomerShell() {
+  const { count } = useCart();
+  return (
+    <div className={count > 0 ? "has-cart" : undefined}>
+      <style>{`.has-cart .fb-card{display:none !important;} .has-cart{padding-bottom:118px;}`}</style>
+      <Outlet />
+      <CartBar />
+    </div>
+  );
+}
+
 // تغليف شاشات الزبون بسلة مشتركة
 function CustomerLayout() {
   return (
     <CartProvider>
-      <Outlet />
+      <CustomerShell />
     </CartProvider>
   );
 }
