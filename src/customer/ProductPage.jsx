@@ -83,13 +83,13 @@ const FEED = [...TOP, ...PEOPLE];
 /* ================================================================== */
 /*  Rich product card (3-col feeds)                                   */
 /* ================================================================== */
-function ProductCard({ p, qty, onAdd, onInc, onDec }) {
+function ProductCard({ p, qty, onAdd, onInc, onDec, fav, onFav }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <div className="flex flex-col">
       <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: "#F3F5F8", overflow: "hidden" }}>
         <div className="absolute inset-0 flex items-center justify-center"><p.Icon size={46} style={{ color: p.accent || "#9AA8B5", opacity: 0.28 }} /></div>
-        <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} style={{ color: "#C7CDD6" }} /></button>
+        <button onClick={onFav} className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} fill={fav ? "#E11D2A" : "none"} style={{ color: fav ? "#E11D2A" : "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ bottom: 42, insetInlineEnd: 8, width: 16, height: 16, borderRadius: 3, border: "1.5px solid #1A7A33", background: "#fff" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#1A7A33" }} /></span>
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between" style={{ padding: 6 }}>
           <span className="rounded-md text-xs font-bold" style={{ background: "rgba(255,255,255,.94)", color: "#3A424E", padding: "2px 6px" }}>{p.weight}</span>
@@ -124,7 +124,7 @@ const Feed3 = ({ title, items, c }) => (
   <section className="px-3 pt-6">
     <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>{title}</h2>
     <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-2.5 gap-y-5">
-      {items.map((p) => <ProductCard key={p.id} p={p} qty={c.qty(p.id)} onAdd={() => c.add(p)} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} />)}
+      {items.map((p) => <ProductCard key={p.id} p={p} qty={c.qty(p.id)} onAdd={() => c.add(p)} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} fav={c.isFav(p.id)} onFav={() => c.toggleFav(p)} />)}
     </div>
   </section>
 );
@@ -136,7 +136,7 @@ export default function ProductPage() {
   const [bannerOpen, setBannerOpen] = useState(true);
   const [gal, setGal] = useState(0);
   const nav = useNavigate();
-  const { qty, add, inc, dec, subtotal } = useCart();
+  const { qty, add, inc, dec, subtotal, isFav, toggleFav } = useCart();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(120);
@@ -148,7 +148,7 @@ export default function ProductPage() {
   }, [bannerOpen]);
 
   const remaining = Math.max(0, FREE_AT - subtotal);
-  const c = { qty, add, inc, dec };
+  const c = { qty, add, inc, dec, isFav, toggleFav };
   const mainQty = qty(MAIN.id);
   const off = Math.round((1 - MAIN.price / MAIN.mrp) * 100);
 
@@ -161,7 +161,7 @@ export default function ProductPage() {
         <div className="flex items-center gap-3 px-4 py-3">
           <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ChevronDown size={20} style={{ color: "#1A1A1A" }} /></button>
           <h1 className="flex-1 min-w-0 text-lg font-extrabold truncate" style={{ color: "#1A1A1A" }}>{MAIN.name}</h1>
-          <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Heart size={18} style={{ color: "#1A1A1A" }} /></button>
+          <button onClick={() => toggleFav(MAIN)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Heart size={18} fill={isFav(MAIN.id) ? "#E11D2A" : "none"} style={{ color: isFav(MAIN.id) ? "#E11D2A" : "#1A1A1A" }} /></button>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={18} style={{ color: "#1A1A1A" }} /></button>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Share2 size={17} style={{ color: "#1A1A1A" }} /></button>
         </div>

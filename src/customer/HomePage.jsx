@@ -9,7 +9,7 @@ import {
   Scissors, Brush, Flower2, Baby, Pill, Wind,
   SprayCan, Shirt, Utensils, Trash2, PawPrint, Pencil, Plug,
   Plus, Minus, Heart, Star, Snowflake,
-  Waves, Luggage, Dumbbell, Palette, BookOpen, Mouse, BatteryCharging, Boxes, Sofa,
+  Waves, Luggage, Dumbbell, Palette, BookOpen, Mouse, BatteryCharging, Boxes, Sofa, Package,
 } from "lucide-react";
 
 /* ================================================================== */
@@ -288,6 +288,35 @@ const NAV = [
   { id: "cart", label: "السلة", Icon: ShoppingCart, to: "/cart" },
 ];
 
+// «اطلب ثانية» — مشترياتك المتكرّرة (إعادة طلب سريع)
+const ORDER_AGAIN = [
+  { id: "oa1", name: "حليب طازج كامل الدسم", weight: "1 لتر", price: 1500, Icon: Milk, accent: "#2B7A9B" },
+  { id: "oa2", name: "بيبسي ٣٣٠ مل", weight: "330 مل", price: 750, Icon: CupSoda, accent: "#23306E" },
+  { id: "oa3", name: "خبز صمون طازج", weight: "٦ قطع", price: 1000, Icon: Croissant, accent: "#C9923E" },
+  { id: "oa4", name: "طماطم طازجة", weight: "1 كغم", price: 1250, Icon: Carrot, accent: "#D33A3A" },
+  { id: "oa5", name: "رز بسمتي", weight: "5 كغم", price: 12000, Icon: Wheat, accent: "#9A6B2E" },
+  { id: "oa6", name: "شيبس بالملح", weight: "150 غرام", price: 1000, Icon: Popcorn, accent: "#E0A21F" },
+];
+
+// باقات/كومبو — كل باقة تُضيف عناصرها للسلة بضغطة
+const BUNDLES = [
+  { id: "bdl1", name: "باقة الفطور", desc: "حليب + جبنة + خبز", emoji: "🍳", price: 8000, mrp: 10500, grad: ["#E0902A", "#FBD38D"], items: [
+    { id: "bf1", name: "حليب طازج", weight: "1 لتر", price: 1500, Icon: Milk, accent: "#2B7A9B" },
+    { id: "bf2", name: "جبنة شيدر مبشورة", weight: "200 غرام", price: 6000, Icon: Milk, accent: "#D9A521" },
+    { id: "bf3", name: "خبز صمون", weight: "٦ قطع", price: 1000, Icon: Croissant, accent: "#C9923E" },
+  ] },
+  { id: "bdl2", name: "باقة التنظيف", desc: "منظّف + صابون + أكياس", emoji: "🧼", price: 7000, mrp: 9000, grad: ["#2B7A9B", "#7FC8E0"], items: [
+    { id: "bc1", name: "منظّف أرضيات", weight: "1 لتر", price: 3500, Icon: SprayCan, accent: "#2B7A9B" },
+    { id: "bc2", name: "مسحوق غسيل", weight: "1 كغم", price: 3000, Icon: Shirt, accent: "#7A5AB8" },
+    { id: "bc3", name: "أكياس نفايات", weight: "٣٠ كيس", price: 1500, Icon: Trash2, accent: "#5A6473" },
+  ] },
+  { id: "bdl3", name: "باقة السناكس", desc: "شيبس + مشروب + شوكولاتة", emoji: "🍿", price: 4000, mrp: 5500, grad: ["#C2477F", "#F1A7C9"], items: [
+    { id: "bs1", name: "شيبس بالملح", weight: "150 غرام", price: 1000, Icon: Popcorn, accent: "#E0A21F" },
+    { id: "bs2", name: "بيبسي ٣٣٠ مل", weight: "330 مل", price: 750, Icon: CupSoda, accent: "#23306E" },
+    { id: "bs3", name: "شوكولاتة بالحليب", weight: "26 غرام", price: 1250, Icon: Candy, accent: "#C2477F" },
+  ] },
+];
+
 const FREE_AT = 15000;
 const BEST_IMG = "https://placehold.co/100x100/F4F6F8/F4F6F8/png";
 const onImgErr = (e) => { e.currentTarget.style.visibility = "hidden"; };
@@ -297,13 +326,13 @@ const clamp2 = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "v
 /* ================================================================== */
 /*  Presentational components (module-level => no remount on type)    */
 /* ================================================================== */
-function ProductCard({ p, accent, Icon, qty, onAdd, onInc, onDec }) {
+function ProductCard({ p, accent, Icon, qty, onAdd, onInc, onDec, fav, onFav }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <div className="flex flex-col">
       <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: "#F5F7F9", overflow: "hidden" }}>
         <div className="absolute inset-0 flex items-center justify-center"><Icon size={44} style={{ color: accent, opacity: 0.26 }} /></div>
-        <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineStart: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} style={{ color: "#C7CDD6" }} /></button>
+        <button onClick={onFav} className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineStart: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} fill={fav ? "#E11D2A" : "none"} style={{ color: fav ? "#E11D2A" : "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 16, height: 16, borderRadius: 3, border: "1.5px solid " + (p.nonveg ? "#B23B3B" : "#1A7A33"), background: "#fff" }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: p.nonveg ? "#B23B3B" : "#1A7A33" }} />
         </span>
@@ -369,10 +398,82 @@ function Feed({ title, sub, items, accent, Icon, c }) {
       {sub && <p className="text-xs font-bold px-0.5 mt-0.5" style={{ color: "#9AA3AF" }}>{sub}</p>}
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-2.5 gap-y-5 mt-3">
         {items.map((p) => (
-          <ProductCard key={p.id} p={p} accent={accent} Icon={Icon} qty={c.qty(p.id)} onAdd={() => c.add({ ...p, Icon, accent })} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} />
+          <ProductCard key={p.id} p={p} accent={accent} Icon={Icon} qty={c.qty(p.id)} onAdd={() => c.add({ ...p, Icon, accent })} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} fav={c.isFav(p.id)} onFav={() => c.toggleFav({ ...p, Icon, accent })} />
         ))}
       </div>
       <button className="see-all w-full rounded-2xl mt-4 flex items-center justify-center gap-2 py-3 text-sm font-extrabold" style={{ color: "#2A3FB8" }}>عرض كل المنتجات <ChevronLeft size={16} /></button>
+    </section>
+  );
+}
+
+/* ---- compact rail card (اطلب ثانية / مفضّلاتك) ---- */
+function RailCard({ p, qty, onAdd, onInc, onDec, fav, onFav }) {
+  const Ic = p.Icon || Package;
+  return (
+    <div className="shrink-0" style={{ width: 118 }}>
+      <div className="relative rounded-xl mb-1.5" style={{ aspectRatio: "1 / 1", background: "#F5F7F9", overflow: "hidden" }}>
+        <div className="absolute inset-0 flex items-center justify-center"><Ic size={38} style={{ color: p.accent || "#9AA8B5", opacity: 0.28 }} /></div>
+        <button onClick={onFav} className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineStart: 6, width: 22, height: 22, background: "#fff" }}><Heart size={12} fill={fav ? "#E11D2A" : "none"} style={{ color: fav ? "#E11D2A" : "#C7CDD6" }} /></button>
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-end" style={{ padding: 5 }}>
+          {qty === 0 ? (
+            <button onClick={onAdd} className="add-btn rounded-lg" style={{ padding: "5px 14px" }}><span className="text-xs" style={{ fontWeight: 800 }}>أضف</span></button>
+          ) : (
+            <div className="stepper rounded-lg overflow-hidden flex items-center">
+              <button onClick={onDec} className="stepper-btn" style={{ padding: "5px 7px" }}><Minus size={12} strokeWidth={2.8} /></button>
+              <span className="text-xs font-extrabold" style={{ width: 16, textAlign: "center" }}>{qty}</span>
+              <button onClick={onInc} className="stepper-btn" style={{ padding: "5px 7px" }}><Plus size={12} strokeWidth={2.8} /></button>
+            </div>
+          )}
+        </div>
+      </div>
+      <p className="text-xs font-bold leading-tight" style={{ ...clamp2, color: "#2A2F36", minHeight: "2.4em" }}>{p.name}</p>
+      <span className="text-xs font-extrabold" style={{ color: "#1A1A1A" }}>{iqd(p.price)}</span>
+    </div>
+  );
+}
+
+function Rail({ title, sub, items, c }) {
+  if (!items.length) return null;
+  return (
+    <section className="max-w-6xl mx-auto px-3 pt-6">
+      <div className="px-0.5 mb-3"><h2 className="text-lg font-extrabold" style={{ color: "#1A1A1A" }}>{title}</h2>{sub && <p className="text-xs font-bold mt-0.5" style={{ color: "#9AA3AF" }}>{sub}</p>}</div>
+      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+        {items.map((p) => (
+          <RailCard key={p.id} p={p} qty={c.qty(p.id)} onAdd={() => c.add(p)} onInc={() => c.inc(p.id)} onDec={() => c.dec(p.id)} fav={c.isFav(p.id)} onFav={() => c.toggleFav(p)} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---- bundles / combos (وفّر مع الباقات) ---- */
+function Bundles({ items, onAdd }) {
+  return (
+    <section className="max-w-6xl mx-auto px-3 pt-7">
+      <h2 className="text-lg font-extrabold mb-1 px-0.5" style={{ color: "#1A1A1A" }}>وفّر مع الباقات 🎁</h2>
+      <p className="text-xs font-bold px-0.5 mb-3" style={{ color: "#9AA3AF" }}>كومبو جاهز بسعر أوفر — أضفه بضغطة</p>
+      <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+        {items.map((b) => {
+          const off = b.mrp > b.price ? Math.round((1 - b.price / b.mrp) * 100) : 0;
+          return (
+            <div key={b.id} className="shrink-0 rounded-2xl overflow-hidden" style={{ width: 234, background: linGrad(b.grad, 150), boxShadow: "0 10px 24px rgba(16,24,40,.14)" }}>
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  {off > 0 && <span className="text-xs font-extrabold rounded-full px-2 py-0.5" style={{ background: "rgba(255,255,255,.92)", color: "#0C831F" }}>وفّر {off}%</span>}
+                  <span style={{ fontSize: 34, marginInlineStart: "auto" }}>{b.emoji}</span>
+                </div>
+                <p className="text-base font-extrabold mt-2" style={{ color: "#fff" }}>{b.name}</p>
+                <p className="text-xs font-semibold mt-0.5" style={{ color: "rgba(255,255,255,.92)" }}>{b.desc}</p>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-lg font-extrabold" style={{ color: "#fff" }}>{iqd(b.price)}</span>
+                  {off > 0 && <span className="text-xs line-through" style={{ color: "rgba(255,255,255,.82)" }}>{iqd(b.mrp)}</span>}
+                </div>
+                <button onClick={() => onAdd(b)} className="rounded-lg mt-3 w-full text-sm font-extrabold" style={{ background: "#fff", color: "#0C831F", padding: "9px" }}>أضف الباقة للسلة</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -456,7 +557,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState("all");
   const [bannerOpen, setBannerOpen] = useState(true);
   const nav = useNavigate();
-  const { qty, add, inc, dec, subtotal, count } = useCart();
+  const { qty, add, inc, dec, subtotal, count, isFav, toggleFav, favList, favCount } = useCart();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(150);
@@ -470,7 +571,8 @@ export default function HomePage() {
   const theme = THEMES[activeTab] || THEMES.all;
   const address = ADDRESSES.find((a) => a.id === addrId);
   const remaining = Math.max(0, FREE_AT - subtotal);
-  const c = { qty, add, inc, dec };
+  const c = { qty, add, inc, dec, isFav, toggleFav };
+  const addBundle = (b) => b.items.forEach((it) => add(it));
 
   return (
     <div className="qc-app min-h-screen" dir="rtl" lang="ar">
@@ -485,6 +587,7 @@ export default function HomePage() {
               <div className="flex items-center gap-2 mt-0.5">
                 <h1 className="font-extrabold leading-none" style={{ color: theme.topText, fontSize: "30px" }}>16 دقيقة</h1>
                 <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2 py-0.5" style={{ background: theme.pill, color: theme.topText }}><Clock size={11} /> 24/7</span>
+                <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2 py-0.5" style={{ background: theme.pill, color: theme.topText }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3BE06A", boxShadow: "0 0 0 2px rgba(59,224,106,.35)" }} /> مفتوح الآن</span>
               </div>
               <div className="flex items-center gap-1 mt-1.5">
                 <span className="text-sm font-bold truncate" style={{ color: theme.topText, maxWidth: "58vw" }}>{address.label} - {address.line}</span>
@@ -551,7 +654,11 @@ export default function HomePage() {
             </div>
           </div>
 
-          <section className="max-w-6xl mx-auto px-3 pt-5">
+          <Rail title="اطلب ثانية 🔁" sub="مشترياتك المتكرّرة بضغطة" items={ORDER_AGAIN} c={c} />
+          {favCount > 0 && <Rail title="مفضّلاتك ❤️" sub={favCount + " منتج محفوظ"} items={favList} c={c} />}
+          <Bundles items={BUNDLES} onAdd={addBundle} />
+
+          <section className="max-w-6xl mx-auto px-3 pt-7">
             <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>الأكثر مبيعاً</h2>
             <div className="grid grid-cols-3 lg:grid-cols-6 gap-2.5">
               {BESTSELLERS.map((cd) => (

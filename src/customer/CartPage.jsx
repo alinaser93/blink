@@ -88,13 +88,13 @@ const clamp2 = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "v
 /* ================================================================== */
 /*  Rich product card (suggestions)                                   */
 /* ================================================================== */
-function ProductCard({ p, qty, onAdd, onInc, onDec }) {
+function ProductCard({ p, qty, onAdd, onInc, onDec, fav, onFav }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <div className="flex flex-col">
       <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: "#F3F5F8", overflow: "hidden" }}>
         <div className="absolute inset-0 flex items-center justify-center"><p.Icon size={44} style={{ color: p.accent || "#9AA8B5", opacity: 0.28 }} /></div>
-        <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} style={{ color: "#C7CDD6" }} /></button>
+        <button onClick={onFav} className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} fill={fav ? "#E11D2A" : "none"} style={{ color: fav ? "#E11D2A" : "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ bottom: 42, insetInlineEnd: 8, width: 16, height: 16, borderRadius: 3, border: "1.5px solid #1A7A33", background: "#fff" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#1A7A33" }} /></span>
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between" style={{ padding: 6 }}>
           <span className="rounded-md text-xs font-bold" style={{ background: "rgba(255,255,255,.94)", color: "#3A424E", padding: "2px 6px" }}>{p.weight}</span>
@@ -435,7 +435,7 @@ export default function CartPage() {
         <section className="mt-4 px-3">
           <h2 className="text-lg font-extrabold mb-3 px-0.5">قد يعجبك أيضاً</h2>
           <div className="grid grid-cols-3 lg:grid-cols-6 gap-x-2.5 gap-y-5">
-            {SUGGEST.map((p) => <ProductCard key={p.id} p={p} qty={cart.qty(p.id)} onAdd={() => cart.add(p)} onInc={() => cart.inc(p.id)} onDec={() => cart.dec(p.id)} />)}
+            {SUGGEST.map((p) => <ProductCard key={p.id} p={p} qty={cart.qty(p.id)} onAdd={() => cart.add(p)} onInc={() => cart.inc(p.id)} onDec={() => cart.dec(p.id)} fav={cart.isFav(p.id)} onFav={() => cart.toggleFav(p)} />)}
           </div>
         </section>
 

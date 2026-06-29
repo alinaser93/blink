@@ -15,10 +15,18 @@ export function CartProvider({ children }) {
   const list = Object.values(items);
   const count = list.reduce((s, x) => s + x.qty, 0);
   const subtotal = list.reduce((s, x) => s + x.price * x.qty, 0);
-  return <CartCtx.Provider value={{ items, list, add, inc, dec, remove, clear, qty, count, subtotal }}>{children}</CartCtx.Provider>;
+
+  // ---- المفضّلة (Retention) — تخزّن المنتج كاملاً لعرضه في رفّ «مفضّلاتك» ----
+  const [favs, setFavs] = useState({}); // id -> product
+  const toggleFav = (p) => setFavs((m) => { if (m[p.id]) { const n = { ...m }; delete n[p.id]; return n; } return { ...m, [p.id]: { ...p, Icon: p.Icon || Package, accent: p.accent || "#0C831F" } }; });
+  const isFav = (id) => !!favs[id];
+  const favList = Object.values(favs);
+  const favCount = favList.length;
+
+  return <CartCtx.Provider value={{ items, list, add, inc, dec, remove, clear, qty, count, subtotal, toggleFav, isFav, favList, favCount }}>{children}</CartCtx.Provider>;
 }
 
-const FALLBACK = { items: {}, list: [], add() {}, inc() {}, dec() {}, remove() {}, clear() {}, qty: () => 0, count: 0, subtotal: 0 };
+const FALLBACK = { items: {}, list: [], add() {}, inc() {}, dec() {}, remove() {}, clear() {}, qty: () => 0, count: 0, subtotal: 0, toggleFav() {}, isFav: () => false, favList: [], favCount: 0 };
 export const useCart = () => useContext(CartCtx) || FALLBACK;
 
 export function BottomNav() {
