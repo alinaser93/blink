@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "./cart.jsx";
 import {
   ArrowRight, Search, Share2, ChevronLeft, Heart, Plus, Minus,
   Mic, PhoneOff, BellOff, Gift, CreditCard, Wallet, Banknote, Star, Clock,
   Check, Home, Drumstick, Carrot, Leaf, Apple, Sprout, Milk, Tag,
+  Bike, X, Info, ShoppingBag, Briefcase, Users,
 } from "lucide-react";
 
 /* ================================================================== */
@@ -39,18 +40,19 @@ const STYLE = `
 .cta { background:#0C831F; color:#fff; transition:all .15s ease; box-shadow:0 6px 18px rgba(12,131,31,.3); }
 .cta:hover { background:#0A7019; }
 .cta:active { transform:scale(.99); }
+.cta:disabled { opacity:.7; cursor:default; }
 .linkrow { transition:background .12s ease; cursor:pointer; }
 .linkrow:hover { background:#FAFBFC; }
+@keyframes pop { 0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1)} }
+.pop { animation:pop .42s cubic-bezier(.2,.7,.3,1); }
+.fill { transition:width .35s cubic-bezier(.4,.1,.2,1); }
+@keyframes ovfade { from{opacity:0} to{opacity:1} }
+.ovfade { animation:ovfade .2s ease; }
 `;
 
 /* ================================================================== */
 /*  Data                                                              */
 /* ================================================================== */
-const CART_INIT = [
-  { id: 1, name: "جزر برتقالي", weight: "200 غرام", price: 750, mrp: 900, qty: 1, Icon: Carrot, accent: "#E08A2E" },
-  { id: 2, name: "فاصوليا خضراء", weight: "250 غرام", price: 1350, mrp: 1750, qty: 1, Icon: Leaf, accent: "#2E9B4F" },
-  { id: 3, name: "طماطم هجينة", weight: "500 غرام", price: 1900, mrp: 2350, qty: 1, Icon: Apple, accent: "#D33A3A" },
-];
 const SUGGEST = [
   { id: 11, name: "باقة كزبرة طازجة", weight: "100 غرام", price: 950, mrp: 1100, stock: 4, seeMore: true, Icon: Leaf, accent: "#2E9B4F" },
   { id: 12, name: "دجاج مقطّع للطبخ", weight: "450 غرام", price: 9950, rating: "4.4", reviews: "48 ألف", tags: ["11 قطعة"], allLabel: "كل الدجاج الطازج", Icon: Drumstick, accent: "#C9692E" },
@@ -64,6 +66,22 @@ const TIPS = [
 ];
 const HANDLING = 500;
 const FREE_AT = 15000;
+const MIN_CART = 6000;
+const SMALL_CART_FEE = 1000;
+
+// أكواد خصم تجريبية شغّالة
+const COUPONS = {
+  WASEL:   { type: "freedel", label: "توصيل مجاني" },
+  AHLAN15: { type: "pct", pct: 15, cap: 5000, label: "خصم ١٥٪" },
+  KASH3:   { type: "flat", amt: 3000, min: 6000, label: "−3000 د.ع" },
+};
+// عناوين محفوظة (نفس نمط الرئيسية)
+const ADDRESSES = [
+  { id: "samawah", label: "البيت", line: "السماوة، شارع الكورنيش", Icon: Home },
+  { id: "baghdad", label: "الدوام", line: "بغداد، المنصور", Icon: Briefcase },
+  { id: "najaf", label: "بيت الأهل", line: "النجف، حي السعد", Icon: Users },
+];
+
 const iqd = (n) => Number(n).toLocaleString("en-US") + " د.ع";
 const clamp2 = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
 
@@ -115,15 +133,76 @@ export default function CartPage() {
   const [tip, setTip] = useState(0);
   const [instr, setInstr] = useState({ call: false, bell: false });
   const [pay, setPay] = useState("cod");
+  const [coupon, setCoupon] = useState(null);
+  const [couponInput, setCouponInput] = useState("");
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponErr, setCouponErr] = useState("");
+  const [feesInfo, setFeesInfo] = useState(false);
+  const [addrId, setAddrId] = useState("samawah");
+  const [addrOpen, setAddrOpen] = useState(false);
+  const [placed, setPlaced] = useState(false);
+  const timerRef = useRef(null);
 
   const items = cart.list;
   const itemsTotal = cart.subtotal;
-  const savings = items.reduce((s, it) => s + ((it.mrp || it.price) - it.price) * it.qty, 0);
-  const delivery = itemsTotal >= FREE_AT || itemsTotal === 0 ? 0 : 2000;
-  const toPay = itemsTotal + delivery + (items.length ? HANDLING : 0) + tip;
 
-  /* ---------------- PAYMENT VIEW ---------------- */
+  /* ---- bill math (single source for both views) ---- */
+  const productSavings = items.reduce((s, it) => s + ((it.mrp || it.price) - it.price) * it.qty, 0);
+  const cc = coupon ? COUPONS[coupon] : null;
+  let couponSaving = 0;
+  if (cc && itemsTotal > 0) {
+    if (cc.type === "pct") couponSaving = Math.min(Math.round(itemsTotal * cc.pct / 100), cc.cap);
+    else if (cc.type === "flat") couponSaving = itemsTotal >= cc.min ? cc.amt : 0;
+  }
+  const discountedItems = Math.max(0, itemsTotal - (coupon === "WASEL" ? 0 : couponSaving));
+  const baseDelivery = itemsTotal === 0 ? 0 : itemsTotal >= FREE_AT ? 0 : 2000;
+  const delivery = coupon === "WASEL" && itemsTotal > 0 ? 0 : baseDelivery;
+  const deliverySaving = coupon === "WASEL" && itemsTotal > 0 ? baseDelivery : 0;
+  const smallFee = itemsTotal > 0 && itemsTotal < MIN_CART ? SMALL_CART_FEE : 0;
+  const handling = items.length ? HANDLING : 0;
+  const toPay = discountedItems + delivery + handling + smallFee + tip;
+  const totalSavings = productSavings + (coupon === "WASEL" ? 0 : couponSaving) + deliverySaving;
+  const remaining = Math.max(0, FREE_AT - itemsTotal);
+  const selectedAddr = ADDRESSES.find((a) => a.id === addrId) || ADDRESSES[0];
+
+  /* ---- effects ---- */
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  useEffect(() => {
+    if (coupon && (itemsTotal === 0 || (coupon === "KASH3" && itemsTotal < MIN_CART))) {
+      setCoupon(null); setCouponInput(""); setCouponErr("");
+    }
+  }, [itemsTotal, coupon]);
+
+  /* ---- handlers ---- */
+  const applyCoupon = (raw) => {
+    const code = String(raw).trim().toUpperCase();
+    const c = COUPONS[code];
+    if (!c || itemsTotal === 0) { setCoupon(null); setCouponErr("الكود مو صحيح أو ما ينطبق على طلبك"); return; }
+    if (c.type === "flat" && itemsTotal < c.min) { setCoupon(null); setCouponErr("هذا الكود يحتاج طلب بـ " + iqd(c.min) + " أو أكثر"); return; }
+    setCoupon(code); setCouponErr(""); setCouponOpen(false); setCouponInput("");
+  };
+  const removeCoupon = () => { setCoupon(null); setCouponInput(""); setCouponErr(""); };
+  const placeOrder = () => {
+    if (placed) return;
+    setPlaced(true);
+    timerRef.current = setTimeout(() => { cart.clear(); nav("/track"); }, 1600);
+  };
+
+  /* ================================================================ */
+  /*  PAYMENT VIEW                                                     */
+  /* ================================================================ */
   if (view === "pay") {
+    if (!items.length && !placed) {
+      // حماية: لا يمكن تأكيد طلب فارغ
+      return (
+        <div className="qc-app min-h-screen flex flex-col items-center justify-center px-6" dir="rtl" lang="ar">
+          <style>{STYLE}</style>
+          <div className="rounded-full flex items-center justify-center mb-4" style={{ width: 88, height: 88, background: "#F3F5F8" }}><ShoppingBag size={40} style={{ color: "#C7CDD6" }} /></div>
+          <p className="text-base font-extrabold">سلّتك فارغة</p>
+          <button onClick={() => { setView("cart"); nav("/"); }} className="cta rounded-xl text-sm font-extrabold mt-4" style={{ padding: "12px 26px" }}>تسوّق الآن</button>
+        </div>
+      );
+    }
     const WALLETS = [{ n: "زين كاش", c: "#7A4FA0" }, { n: "آسيا حوالة", c: "#2E9B4F" }, { n: "فاست باي", c: "#E0552E" }, { n: "قي كارد", c: "#23306E" }];
     return (
       <div className="qc-app min-h-screen" dir="rtl" lang="ar">
@@ -136,11 +215,18 @@ export default function CartPage() {
         </div>
 
         <div className="px-3 pt-2 space-y-3 pb-28">
+          {/* delivery destination */}
+          <div className="card rounded-2xl flex items-center gap-3 px-4 py-3">
+            <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FFF6E0" }}><selectedAddr.Icon size={20} style={{ color: "#E0A800" }} /></span>
+            <div className="flex-1 min-w-0"><p className="text-sm font-extrabold">التوصيل إلى {selectedAddr.label}</p><p className="text-xs truncate" style={{ color: "#7A8493" }}>{selectedAddr.line}</p></div>
+            <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2.5 py-1" style={{ background: "#EAF6EC", color: "#0C831F" }}><Clock size={12} /> ~12 دقيقة</span>
+          </div>
+
           <div className="card rounded-2xl overflow-hidden">
             <p className="text-base font-extrabold px-4 pt-4 pb-2">الدفع عند الاستلام</p>
             <button onClick={() => setPay("cod")} className={"opt-card m-3 mt-0 rounded-xl w-auto flex items-center gap-3 p-3 " + (pay === "cod" ? "on" : "")} style={{ width: "calc(100% - 24px)" }}>
               <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#fff" }}><Banknote size={22} style={{ color: "#1A7A33" }} /></span>
-              <div className="flex-1 text-right"><p className="text-sm font-extrabold">نقداً عند الاستلام</p><p className="text-xs" style={{ color: "#7A8493" }}>ادفع الكاش وقت توصيل الطلب</p></div>
+              <div className="flex-1 text-start"><p className="text-sm font-extrabold">نقداً عند الاستلام</p><p className="text-xs" style={{ color: "#7A8493" }}>ادفع الكاش وقت توصيل الطلب</p></div>
               <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ border: "2px solid " + (pay === "cod" ? "#0C831F" : "#C7CDD6"), background: pay === "cod" ? "#0C831F" : "#fff" }}>{pay === "cod" && <Check size={14} color="#fff" strokeWidth={3} />}</span>
             </button>
           </div>
@@ -168,39 +254,82 @@ export default function CartPage() {
 
         <div className="fixed left-0 right-0 bottom-0 z-50" style={{ background: "#fff", borderTop: "1px solid #ECECEC", boxShadow: "0 -6px 20px rgba(16,24,40,.07)" }}>
           <div className="px-4 py-3">
-            <button onClick={() => { cart.clear(); nav("/track"); }} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-center gap-2" style={{ padding: "15px" }}>تأكيد الطلب · {iqd(toPay)}</button>
+            <button onClick={placeOrder} disabled={placed} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-center gap-2" style={{ padding: "15px" }}>تأكيد الطلب · {iqd(toPay)}</button>
           </div>
+        </div>
+
+        {/* order-placed celebration */}
+        {placed && (
+          <div className="ovfade fixed inset-0 flex items-center justify-center px-8" style={{ background: "rgba(16,24,40,.55)", zIndex: 60 }}>
+            <div className="card rounded-3xl text-center px-7 py-8" style={{ maxWidth: 340, boxShadow: "0 24px 60px rgba(16,24,40,.3)" }}>
+              <div className="pop rounded-full flex items-center justify-center mx-auto" style={{ width: 76, height: 76, background: "#EAF6EC", border: "3px solid #0C831F" }}><Check size={40} strokeWidth={3} style={{ color: "#0C831F" }} /></div>
+              <h2 className="text-xl font-extrabold mt-4">تم تأكيد طلبك! 🎉</h2>
+              <p className="text-sm mt-1" style={{ color: "#5A6473" }}>يوصلك خلال ~12 دقيقة · الدفع عند الاستلام</p>
+              <p className="text-xs mt-2 truncate" style={{ color: "#9AA3AF" }}>{selectedAddr.label} · {selectedAddr.line}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ================================================================ */
+  /*  CART VIEW — empty state                                         */
+  /* ================================================================ */
+  if (items.length === 0) {
+    return (
+      <div className="qc-app min-h-screen" dir="rtl" lang="ar">
+        <style>{STYLE}</style>
+        <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F2F4" }}>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} /></button>
+            <h1 className="flex-1 text-xl font-extrabold">السلة</h1>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center px-8 text-center" style={{ minHeight: "70vh" }}>
+          <div className="rounded-full flex items-center justify-center" style={{ width: 110, height: 110, background: "#F3F5F8" }}><ShoppingBag size={48} style={{ color: "#C7CDD6" }} /></div>
+          <p className="text-lg font-extrabold mt-5">سلّتك فارغة</p>
+          <p className="text-sm mt-1" style={{ color: "#7A8493" }}>ابدأ التسوّق وخلّي نوصّلك بأقل من ١٥ دقيقة</p>
+          <button onClick={() => nav("/")} className="cta rounded-xl text-base font-extrabold mt-5" style={{ padding: "14px 32px" }}>تسوّق الآن</button>
         </div>
       </div>
     );
   }
 
-  /* ---------------- CART VIEW ---------------- */
+  /* ================================================================ */
+  /*  CART VIEW                                                        */
+  /* ================================================================ */
+  const couponChipText = coupon === "WASEL" && baseDelivery === 0
+    ? "التوصيل أصلاً مجاني"
+    : "وفّرت " + iqd(couponSaving > 0 ? couponSaving : deliverySaving);
+
   return (
     <div className="qc-app min-h-screen" dir="rtl" lang="ar">
       <style>{STYLE}</style>
 
       {/* header */}
       <div className="sticky top-0 z-30" style={{ background: "#fff", borderBottom: "1px solid #F1F2F4" }}>
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-center gap-3 px-4 pt-3 pb-2">
           <button onClick={() => nav(-1)} className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><ArrowRight size={20} /></button>
           <h1 className="flex-1 text-xl font-extrabold">السلة</h1>
           <button className="icon-btn w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ border: "1px solid #ECECEC" }}><Search size={19} /></button>
           <button className="icon-btn rounded-full flex items-center gap-1.5 shrink-0" style={{ border: "1px solid #ECECEC", padding: "8px 14px" }}><Share2 size={16} /><span className="text-sm font-bold">مشاركة</span></button>
         </div>
+        <div className="px-4 pb-2.5">
+          <span className="pill-link inline-flex items-center gap-1.5 rounded-full text-xs font-bold" style={{ padding: "5px 12px" }}><Clock size={14} /> التوصيل خلال ~12 دقيقة</span>
+        </div>
       </div>
 
-      <div className="pb-40">
+      <div className="pb-44">
         {/* cart items */}
         <div className="card mt-2 mx-3 rounded-2xl px-3">
-          {items.length === 0 && <p className="text-center py-8 text-sm" style={{ color: "#7A8493" }}>سلّتك فارغة</p>}
           {items.map((it, i) => (
             <div key={it.id} className="flex items-start gap-3 py-3" style={{ borderTop: i ? "1px solid #F2F3F5" : "none" }}>
               <div className="rounded-xl flex items-center justify-center shrink-0" style={{ width: 64, height: 64, background: "#F3F5F8" }}><it.Icon size={30} style={{ color: it.accent, opacity: 0.5 }} /></div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold leading-tight" style={{ color: "#1A1A1A" }}>{it.name}</p>
                 <p className="text-xs mt-0.5" style={{ color: "#7A8493" }}>{it.weight}</p>
-                <button onClick={() => cart.remove(it.id)} className="text-xs mt-1 font-semibold" style={{ color: "#9AA3AF", textDecoration: "underline" }}>نقل إلى المفضّلة</button>
+                <button onClick={() => cart.remove(it.id)} className="text-xs mt-1 font-semibold" style={{ color: "#9AA3AF", textDecoration: "underline" }}>إزالة من السلة</button>
               </div>
               <div className="flex flex-col items-end gap-1.5 shrink-0">
                 <div className="stepper rounded-lg overflow-hidden flex items-center">
@@ -217,23 +346,89 @@ export default function CartPage() {
           ))}
         </div>
 
-        {/* bill details */}
+        {/* coupon */}
         <div className="card mt-3 mx-3 rounded-2xl p-4">
-          <h2 className="text-base font-extrabold mb-3">تفاصيل الفاتورة</h2>
-          <Row label="إجمالي المنتجات" value={iqd(itemsTotal)} />
-          <Row label="رسوم التوصيل" value={delivery === 0 ? "مجاني" : iqd(delivery)} green={delivery === 0} />
-          <Row label="رسوم المناولة" value={iqd(HANDLING)} />
-          {tip > 0 && <Row label="إكرامية الكابتن" value={iqd(tip)} />}
-          <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: "1px dashed #E3E6EB" }}>
-            <span className="text-base font-extrabold">المجموع للدفع</span>
-            <span className="text-base font-extrabold">{iqd(toPay)}</span>
-          </div>
-          {savings > 0 && (
-            <div className="flex items-center gap-2 mt-3 rounded-xl px-3 py-2" style={{ background: "#EAF6EC" }}>
-              <Tag size={15} style={{ color: "#0C831F" }} />
-              <span className="text-xs font-extrabold" style={{ color: "#0C831F" }}>وفّرت {iqd(savings)} على هذا الطلب</span>
+          {coupon ? (
+            <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "#EAF6EC" }}>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#D7EEDB" }}><Check size={17} strokeWidth={3} style={{ color: "#0C831F" }} /></span>
+              <div className="flex-1 min-w-0"><p className="text-sm font-extrabold" style={{ color: "#0C831F" }}>تم تطبيق {coupon}</p><p className="text-xs" style={{ color: "#3A8A4A" }}>{couponChipText}</p></div>
+              <button onClick={removeCoupon} className="icon-btn rounded-full flex items-center justify-center shrink-0" style={{ width: 28, height: 28, background: "#fff" }}><X size={16} style={{ color: "#5A6473" }} /></button>
+            </div>
+          ) : !couponOpen ? (
+            <button onClick={() => { setCouponOpen(true); setCouponErr(""); }} className="linkrow w-full flex items-center gap-3 rounded-xl">
+              <Tag size={20} style={{ color: "#0C831F" }} />
+              <span className="flex-1 text-sm font-extrabold text-start">أضف كود خصم</span>
+              <ChevronLeft size={18} style={{ color: "#9AA3AF" }} />
+            </button>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus value={couponInput}
+                  onChange={(e) => { setCouponInput(e.target.value); if (couponErr) setCouponErr(""); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyCoupon(couponInput); }}
+                  placeholder="اكتب كود الخصم..." className="flex-1 rounded-xl outline-none text-sm font-bold text-start"
+                  style={{ border: "1.5px solid #ECEEF2", height: 42, padding: "0 12px", textTransform: "uppercase", minWidth: 0 }}
+                />
+                <button onClick={() => applyCoupon(couponInput)} className="add-btn rounded-xl text-sm font-extrabold shrink-0" style={{ padding: "11px 18px" }}>تطبيق</button>
+              </div>
+              {couponErr && <p className="text-xs font-bold mt-2" style={{ color: "#D33A3A" }}>{couponErr}</p>}
+              <div className="flex gap-2 overflow-x-auto no-scrollbar mt-3">
+                {Object.keys(COUPONS).map((k) => (
+                  <button key={k} onClick={() => applyCoupon(k)} className="pill-link shrink-0 inline-flex items-center gap-1.5 rounded-lg text-xs font-extrabold" style={{ padding: "7px 12px" }}>
+                    <Tag size={12} /> {COUPONS[k].label} · {k}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
+        </div>
+
+        {/* free-delivery nudge + bill details */}
+        <div className="card mt-3 mx-3 rounded-2xl overflow-hidden">
+          {/* nudge */}
+          <div style={{ background: delivery === 0 ? "#EAF6EC" : "#EFF4FF", padding: "10px 14px" }}>
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg flex items-center justify-center shrink-0" style={{ width: 26, height: 26, background: delivery === 0 ? "#D7EEDB" : "#DCE8FF" }}>
+                {delivery === 0 ? <Check size={15} strokeWidth={3} style={{ color: "#0C831F" }} /> : <Bike size={15} style={{ color: "#2563EB" }} />}
+              </span>
+              <p className="text-xs font-bold flex-1 leading-tight" style={{ color: delivery === 0 ? "#0C831F" : "#2B59C3" }}>
+                {delivery === 0 ? "🎉 توصيلك صار مجاني!" : <>أضف بـ <b>{iqd(remaining)}</b> وتوصيلك يصير مجاني</>}
+              </p>
+            </div>
+            <div className="mt-1.5 rounded-full overflow-hidden" style={{ height: 6, background: delivery === 0 ? "#CBE7D0" : "#D5E2FB" }}>
+              <div className="fill h-full rounded-full" style={{ width: Math.max(7, Math.min(100, (itemsTotal / FREE_AT) * 100)) + "%", background: delivery === 0 ? "#0C831F" : "#2563EB" }} />
+            </div>
+          </div>
+
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-extrabold">تفاصيل الفاتورة</h2>
+              <button onClick={() => setFeesInfo((v) => !v)} className="pill-link inline-flex items-center gap-1 rounded-full text-xs font-bold" style={{ padding: "4px 10px" }}><Info size={12} /> ليش هذي الرسوم؟</button>
+            </div>
+            {feesInfo && (
+              <p className="text-xs leading-relaxed mb-3 rounded-xl p-3" style={{ color: "#5A6473", background: "#F6F7F9" }}>
+                <b>المناولة</b>: تجهيز وتعبئة طلبك. <b>التوصيل</b>: مجاني فوق {iqd(FREE_AT)}، وإلا 2,000 د.ع. <b>رسوم السلة الصغيرة</b>: تنطبق على الطلبات تحت {iqd(MIN_CART)} وتُلغى بزيادة الطلب.
+              </p>
+            )}
+            <Row label="إجمالي المنتجات" value={iqd(itemsTotal)} />
+            {smallFee > 0 && <Row label="رسوم سلة صغيرة" value={iqd(smallFee)} />}
+            {smallFee > 0 && <p className="text-xs mb-1" style={{ color: "#7A8493" }}>أضف بـ {iqd(MIN_CART - itemsTotal)} لتلغي رسوم السلة الصغيرة</p>}
+            <Row label="رسوم التوصيل" value={delivery === 0 ? "مجاني" : iqd(delivery)} green={delivery === 0} />
+            <Row label="رسوم المناولة" value={iqd(handling)} />
+            {couponSaving > 0 && <Row label={"خصم · " + coupon} value={"− " + iqd(couponSaving)} green />}
+            {tip > 0 && <Row label="إكرامية الكابتن" value={iqd(tip)} />}
+            <div className="flex items-center justify-between pt-3 mt-1" style={{ borderTop: "1px dashed #E3E6EB" }}>
+              <span className="text-base font-extrabold">المجموع للدفع</span>
+              <span className="text-base font-extrabold">{iqd(toPay)}</span>
+            </div>
+            {totalSavings > 0 && (
+              <div className="flex items-center gap-2 mt-3 rounded-xl px-3 py-2" style={{ background: "#EAF6EC" }}>
+                <Tag size={15} style={{ color: "#0C831F" }} />
+                <span className="text-xs font-extrabold" style={{ color: "#0C831F" }}>وفّرت {iqd(totalSavings)} الكلّي على هذا الطلب</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* you might also like */}
@@ -253,11 +448,11 @@ export default function CartPage() {
             </div>
             <button onClick={() => setInstr((s) => ({ ...s, call: !s.call }))} className={"opt-card shrink-0 rounded-xl p-3 flex flex-col gap-2 " + (instr.call ? "on" : "")} style={{ width: 130 }}>
               <div className="flex items-center justify-between"><PhoneOff size={20} style={{ color: "#5A6473" }} /><span className="w-5 h-5 rounded flex items-center justify-center" style={{ border: "2px solid " + (instr.call ? "#0C831F" : "#C7CDD6"), background: instr.call ? "#0C831F" : "#fff" }}>{instr.call && <Check size={12} color="#fff" strokeWidth={3} />}</span></div>
-              <span className="text-sm font-bold text-right">تجنّب الاتصال</span>
+              <span className="text-sm font-bold text-start">تجنّب الاتصال</span>
             </button>
             <button onClick={() => setInstr((s) => ({ ...s, bell: !s.bell }))} className={"opt-card shrink-0 rounded-xl p-3 flex flex-col gap-2 " + (instr.bell ? "on" : "")} style={{ width: 130 }}>
               <div className="flex items-center justify-between"><BellOff size={20} style={{ color: "#5A6473" }} /><span className="w-5 h-5 rounded flex items-center justify-center" style={{ border: "2px solid " + (instr.bell ? "#0C831F" : "#C7CDD6"), background: instr.bell ? "#0C831F" : "#fff" }}>{instr.bell && <Check size={12} color="#fff" strokeWidth={3} />}</span></div>
-              <span className="text-sm font-bold text-right">لا تقرع الجرس</span>
+              <span className="text-sm font-bold text-start">لا تقرع الجرس</span>
             </button>
           </div>
         </section>
@@ -281,12 +476,6 @@ export default function CartPage() {
           </div>
         </section>
 
-        {/* gift packaging */}
-        <div className="card mt-4 mx-3 rounded-2xl p-4 flex items-center gap-3">
-          <Gift size={22} style={{ color: "#9AA3AF" }} />
-          <div><p className="text-sm font-extrabold">تغليف هدية</p><p className="text-xs" style={{ color: "#9AA3AF" }}>غير متوفّر حالياً في موقعك</p></div>
-        </div>
-
         {/* cancellation policy */}
         <div className="card mt-4 mx-3 rounded-2xl p-4">
           <h2 className="text-base font-extrabold mb-1">سياسة الإلغاء</h2>
@@ -294,17 +483,33 @@ export default function CartPage() {
         </div>
       </div>
 
-      {/* bottom: address + pay button */}
+      {/* bottom: address picker + pay button */}
+      {addrOpen && <div className="fixed inset-0" style={{ zIndex: 40 }} onClick={() => setAddrOpen(false)} />}
       <div className="fixed left-0 right-0 bottom-0 z-50" style={{ background: "#fff", borderTop: "1px solid #ECECEC", boxShadow: "0 -6px 20px rgba(16,24,40,.07)" }}>
-        <div onClick={() => nav("/address")} className="linkrow flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: "1px solid #F2F3F5" }}>
-          <Home size={26} style={{ color: "#E0A800" }} />
-          <div className="flex-1 min-w-0"><p className="text-sm font-extrabold">التوصيل إلى البيت</p><p className="text-xs truncate" style={{ color: "#7A8493" }}>علي، السماوة، شارع الكورنيش...</p></div>
+        {addrOpen && (
+          <div className="no-scrollbar" style={{ borderBottom: "1px solid #F2F3F5", maxHeight: 280, overflowY: "auto" }}>
+            <p className="px-4 pt-3 pb-1 text-xs font-bold" style={{ color: "#9AA3AF" }}>اختر عنوان التوصيل</p>
+            {ADDRESSES.map((a) => {
+              const on = a.id === addrId;
+              return (
+                <button key={a.id} onClick={() => { setAddrId(a.id); setAddrOpen(false); }} className="linkrow w-full flex items-center gap-3 px-4 py-3 text-start">
+                  <a.Icon size={20} style={{ color: on ? "#1A7A33" : "#9AA3AF" }} />
+                  <div className="flex-1 min-w-0"><p className="text-sm font-bold">{a.label}</p><p className="text-xs truncate" style={{ color: "#7A8493" }}>{a.line}</p></div>
+                  {on && <Check size={18} style={{ color: "#0C831F" }} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div onClick={() => setAddrOpen((o) => !o)} className="linkrow flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: "1px solid #F2F3F5" }}>
+          <selectedAddr.Icon size={26} style={{ color: "#E0A800" }} />
+          <div className="flex-1 min-w-0"><p className="text-sm font-extrabold">التوصيل إلى {selectedAddr.label}</p><p className="text-xs truncate" style={{ color: "#7A8493" }}>{selectedAddr.line}</p></div>
           <span className="text-sm font-extrabold shrink-0" style={{ color: "#0C831F" }}>تغيير</span>
         </div>
         <div className="px-4 py-3">
-          <button onClick={() => items.length ? setView("pay") : nav("/")} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-between" style={{ padding: "14px 18px" }}>
-            <span>{items.length ? iqd(toPay) : ""}</span>
-            <span className="flex items-center gap-1">{items.length ? "اختر طريقة الدفع" : "ابدأ التسوّق الآن"} <ChevronLeft size={18} /></span>
+          <button onClick={() => setView("pay")} className="cta w-full rounded-xl text-base font-extrabold flex items-center justify-between" style={{ padding: "14px 18px" }}>
+            <span>{iqd(toPay)}</span>
+            <span className="flex items-center gap-1">اختر طريقة الدفع <ChevronLeft size={18} /></span>
           </button>
         </div>
       </div>
