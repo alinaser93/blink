@@ -10,6 +10,7 @@ import CartPage from "./customer/CartPage.jsx";
 import AddressMapScreen from "./customer/AddressMapScreen.jsx";
 import OrderTrackingScreen from "./customer/OrderTrackingScreen.jsx";
 import AdminDashboard from "./admin/AdminDashboard.jsx";
+import RiderApp from "./rider/RiderApp.jsx";
 
 // تغليف شاشات الزبون بسلة مشتركة
 function CustomerLayout() {
@@ -25,6 +26,8 @@ export default function App() {
     <Routes>
       {/* لوحة التاجر — منفصلة تماماً على /admin */}
       <Route path="/admin" element={<AdminDashboard />} />
+      {/* تطبيق المندوب — منفصل، لا يحتاج سلّة */}
+      <Route path="/rider" element={<RiderApp />} />
 
       {/* تطبيق الزبون — يفتح مباشرة على الرئيسية */}
       <Route element={<CustomerLayout />}>
