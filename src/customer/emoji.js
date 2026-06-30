@@ -79,10 +79,17 @@ const MAP = [
   [/مكتبي|قرطاسية|أقلام/, "✏️"],
   [/مائدة|صحون|أطباق/, "🍽️"],
   [/مطبخ|طبخ|قدر|أجهزة المطبخ/, "🍳"],
+  [/جوال|موبايل|هاتف|آيفون|اندرويد|إلكترون|إكسسوار|حافظة|واقي شاشة|حامل/, "📱"],
 ];
 
 export function emojiFor(name = "", fallback = "🛒") {
   const n = String(name);
   for (const [re, e] of MAP) if (re.test(n)) return e;
   return fallback;
+}
+
+// إيموجي المنتج: يُفضّل إيموجي المنتج نفسه (من الكتالوج/الاستيراد) ثم يُشتقّ من الاسم
+export function prodEmoji(p, fallback = "🛒") {
+  const e = p && typeof p.emoji === "string" ? p.emoji.trim() : "";
+  return e || emojiFor(p && p.name, fallback);
 }

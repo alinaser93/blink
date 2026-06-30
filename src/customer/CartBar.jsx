@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCart } from "./cart.jsx";
-import { emojiFor } from "./emoji.js";
+import { emojiFor, prodEmoji } from "./emoji.js";
 import { ShoppingCart, ChevronLeft, Bike, Package, Check } from "lucide-react";
 
 /* ================================================================== */
@@ -67,7 +67,7 @@ export default function CartBar() {
               <span className="flex items-center" style={{ paddingInlineStart: thumbs.length > 1 ? 8 : 0 }}>
                 {thumbs.map((it, i) => (
                   <span key={it.id} className="rounded-lg flex items-center justify-center" style={{ width: 32, height: 32, background: "#fff", border: "2px solid #0C831F", marginInlineStart: i ? -10 : 0, zIndex: thumbs.length - i, fontSize: 17 }}>
-                    {emojiFor(it.name)}
+                    {prodEmoji(it)}
                   </span>
                 ))}
               </span>

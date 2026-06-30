@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "./cart.jsx";
 import { useCatalog } from "./catalog.js";
-import { emojiFor } from "./emoji.js";
+import { emojiFor, prodEmoji } from "./emoji.js";
 import {
   MapPin, ChevronDown, ChevronLeft, Wallet, User, Search, Mic, X, Clock,
   Bike, Home, Printer, LayoutGrid, ShoppingBag, ShoppingCart, Umbrella, Headphones, Sparkles, Lamp,
@@ -137,7 +137,7 @@ function ProductCard({ p, accent, Icon, qty, onAdd, onInc, onDec }) {
   return (
     <div className="flex flex-col">
       <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: (accent || "#9AA8B5") + "16", overflow: "hidden" }}>
-        <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 52 }}>{emojiFor(p.name)}</div>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 52 }}>{prodEmoji(p)}</div>
         <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineStart: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} style={{ color: "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 16, height: 16, borderRadius: 3, border: "1.5px solid " + (p.nonveg ? "#B23B3B" : "#1A7A33"), background: "#fff" }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: p.nonveg ? "#B23B3B" : "#1A7A33" }} />
@@ -268,8 +268,9 @@ export default function HomePage() {
   const tabs = [{ id: "all", label: "الكل", Icon: ShoppingBag }, ...catTabs];
   const bestsellers = tier1.slice(0, 6).map((cobj) => {
     const ps = byCat(cobj.id);
-    const e = ps.slice(0, 4).map((p) => emojiFor(p.name));
-    while (e.length < 4) e.push("🛒");
+    const base = ps.slice(0, 4).map((p) => prodEmoji(p));     // إيموجي المنتج نفسه ثم من الاسم
+    // ملء الفسيفساء 2×2 بلا أيقونات سلّة: نكرّر المتوفّر، وإلا إيموجي القسم
+    const e = Array.from({ length: 4 }, (_, i) => (base.length ? base[i % base.length] : emojiFor(cobj.name)));
     return { id: cobj.id, name: cobj.name, count: ps.length, e };
   });
   const sections = tier1.map((cobj) => {

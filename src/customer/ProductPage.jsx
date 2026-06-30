@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "./cart.jsx";
 import { useCatalog } from "./catalog.js";
-import { emojiFor } from "./emoji.js";
+import { emojiFor, prodEmoji } from "./emoji.js";
 import {
   ChevronDown, ChevronLeft, Heart, Search, Share2, Plus, Minus, Clock, Bike, X, RefreshCcw,
   Citrus, Carrot, Leaf, Apple, Cherry, Salad, Sprout,
@@ -67,7 +67,7 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
   return (
     <div className="flex flex-col">
       <div className="relative rounded-xl mb-2" style={{ aspectRatio: "1 / 1", background: (p.accent || "#9AA8B5") + "16", overflow: "hidden" }}>
-        <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 48 }}>{emojiFor(p.name)}</div>
+        <div className="absolute inset-0 flex items-center justify-center" style={{ fontSize: 48 }}>{prodEmoji(p)}</div>
         <button className="wish absolute rounded-full flex items-center justify-center" style={{ top: 6, insetInlineEnd: 6, width: 24, height: 24, background: "#fff" }}><Heart size={13} style={{ color: "#C7CDD6" }} /></button>
         <span className="absolute flex items-center justify-center" style={{ bottom: 42, insetInlineEnd: 8, width: 16, height: 16, borderRadius: 3, border: "1.5px solid #1A7A33", background: "#fff" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "#1A7A33" }} /></span>
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between" style={{ padding: 6 }}>
@@ -176,7 +176,7 @@ export default function ProductPage() {
       {/* ===== image gallery ===== */}
       <div className="relative" style={{ background: (main.accent || "#9AA8B5") + "14" }}>
         <div className="max-w-3xl mx-auto flex items-center justify-center" style={{ height: 300, fontSize: 130 }}>
-          {emojiFor(main.name)}
+          {prodEmoji(main)}
         </div>
         <div className="absolute inset-x-0 flex items-center justify-center gap-1.5" style={{ bottom: 12 }}>
           {[0, 1, 2, 3].map((i) => (
