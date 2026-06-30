@@ -5,7 +5,7 @@ import { useCatalog } from "./catalog.js";
 import { emojiFor } from "./emoji.js";
 import {
   MapPin, ChevronDown, ChevronLeft, Wallet, User, Search, Mic, X, Clock,
-  Bike, Home, Printer, LayoutGrid, ShoppingBag, ShoppingCart, Umbrella, Headphones, Sparkles, Lamp,
+  Bike, Home, Printer, LayoutGrid, ShoppingBag, ShoppingBasket, ShoppingCart, Umbrella, Headphones, Sparkles, Lamp, Gift,
   Carrot, Wheat, Droplet, Milk, Croissant, Bean, Drumstick, CookingPot,
   Popcorn, Candy, CupSoda, Coffee, Soup, Sandwich, IceCreamCone,
   Scissors, Brush, Flower2, Baby, Pill, Wind,
@@ -68,20 +68,54 @@ const STYLE = `
 .loc-item { transition:background .12s ease; }
 .loc-item:hover { background:#F3F4F6; }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.search-field:active { transform:scale(.995); }
+.hint-word { display:inline-block; animation:hintIn .5s cubic-bezier(.2,.7,.2,1); }
+@keyframes hintIn { from{ opacity:0; transform:translateY(110%);} to{ opacity:1; transform:translateY(0);} }
+.cat-banner { position:relative; overflow:hidden; }
+.cat-banner-name { letter-spacing:-.5px; animation:catIn .35s ease; }
+.cat-banner-sub { animation:catIn .45s ease; }
+@keyframes catIn { from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:translateY(0);} }
+.cat-emoji-1 { animation:floatY 3.4s ease-in-out infinite; }
+.cat-emoji-2 { animation:floatY 3.4s ease-in-out infinite .6s; }
+@keyframes floatY { 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
 `;
 
 const linGrad = (g, a) => "linear-gradient(" + (a || 120) + "deg, " + g.join(", ") + ")";
 
 /* ================================================================== */
-/*  Themes per tab                                                    */
+/*  Themes per tab — كل تبويب له لونه (بنمط Blinkit: باستيل + نص داكن)   */
 /* ================================================================== */
 const THEMES = {
-  all:    { grad: "radial-gradient(130% 95% at 50% -25%, #F9D262 0%, #E7AB22 52%, #DDA01C 100%)", solid: "#DDA01C", topText: "#FFFFFF", topSub: "rgba(255,255,255,.9)", tabText: "#FFFFFF", pill: "rgba(0,0,0,.18)", profileBg: "rgba(60,42,15,.55)" },
-  vac:    { grad: "linear-gradient(180deg, #BFE3F5 0%, #D9F0FA 60%, #EAF7FC 100%)", solid: "#CDE9F6", topText: "#13405E", topSub: "#3D6E8C", tabText: "#13405E", pill: "rgba(19,64,94,.14)", profileBg: "rgba(19,64,94,.22)" },
-  elec:   { grad: "linear-gradient(180deg, #2A2E5A 0%, #3A3F76 60%, #4A4F8C 100%)", solid: "#343A6E", topText: "#FFFFFF", topSub: "rgba(255,255,255,.85)", tabText: "#FFFFFF", pill: "rgba(255,255,255,.2)", profileBg: "rgba(255,255,255,.2)" },
-  beauty: { grad: "linear-gradient(180deg, #F6BBD6 0%, #FBD7E7 60%, #FDEDF4 100%)", solid: "#F7C9DE", topText: "#7A2348", topSub: "#A8557A", tabText: "#7A2348", pill: "rgba(122,35,72,.14)", profileBg: "rgba(122,35,72,.2)" },
-  decor:  { grad: "linear-gradient(180deg, #E5C49A 0%, #F0DBC0 60%, #F7ECDD 100%)", solid: "#E8CFAA", topText: "#5A3A1E", topSub: "#8A6440", tabText: "#5A3A1E", pill: "rgba(90,58,30,.14)", profileBg: "rgba(90,58,30,.2)" },
+  // الذهبي = تبويب «الكل» (النص داكن مثل بلنكت تماماً)
+  gold:   { grad: "radial-gradient(135% 100% at 50% -20%, #FCE08A 0%, #F4C53D 48%, #E7AB22 100%)", solid: "#F4C53D", topText: "#3A2A0A", topSub: "rgba(58,42,10,.84)", tabText: "#3A2A0A", pill: "rgba(58,42,10,.12)", profileBg: "rgba(255,255,255,.5)", banner: ["#F6C93F", "#E59B17"], onBanner: "#3A2A0A", onBannerSub: "rgba(58,42,10,.84)" },
+  sky:    { grad: "linear-gradient(180deg, #BFE3F5 0%, #D9F0FA 55%, #EAF7FC 100%)", solid: "#CDE9F6", topText: "#0F3D5C", topSub: "rgba(15,61,92,.7)", tabText: "#0F3D5C", pill: "rgba(15,61,92,.12)", profileBg: "rgba(15,61,92,.16)", banner: ["#BDE3F4", "#E7F6FC"], onBanner: "#0F3D5C", onBannerSub: "rgba(15,61,92,.7)" },
+  pink:   { grad: "linear-gradient(180deg, #F6BBD6 0%, #FBD7E7 55%, #FDEDF4 100%)", solid: "#F7C9DE", topText: "#7A2348", topSub: "rgba(122,35,72,.7)", tabText: "#7A2348", pill: "rgba(122,35,72,.12)", profileBg: "rgba(122,35,72,.16)", banner: ["#F7BBD6", "#FDE6F0"], onBanner: "#7A2348", onBannerSub: "rgba(122,35,72,.7)" },
+  peach:  { grad: "linear-gradient(180deg, #E9C9A0 0%, #F3DEC4 55%, #F9EEE0 100%)", solid: "#EFD4B0", topText: "#5A3A1E", topSub: "rgba(90,58,30,.7)", tabText: "#5A3A1E", pill: "rgba(90,58,30,.12)", profileBg: "rgba(90,58,30,.16)", banner: ["#EBCBA2", "#F8EBDB"], onBanner: "#5A3A1E", onBannerSub: "rgba(90,58,30,.7)" },
+  mint:   { grad: "linear-gradient(180deg, #B6E2C2 0%, #D3F0DB 55%, #E9F8ED 100%)", solid: "#C8EBD2", topText: "#0C5E27", topSub: "rgba(12,94,39,.85)", tabText: "#0C5E27", pill: "rgba(12,94,39,.12)", profileBg: "rgba(12,94,39,.14)", banner: ["#BBE5C7", "#E5F6EA"], onBanner: "#0C5E27", onBannerSub: "rgba(12,94,39,.85)" },
+  lavender:{ grad: "linear-gradient(180deg, #D5C5EE 0%, #E6DCF6 55%, #F2ECFB 100%)", solid: "#DECFF1", topText: "#5B2A7A", topSub: "rgba(91,42,122,.7)", tabText: "#5B2A7A", pill: "rgba(91,42,122,.12)", profileBg: "rgba(91,42,122,.14)", banner: ["#D7C7EF", "#EFE7FA"], onBanner: "#5B2A7A", onBannerSub: "rgba(91,42,122,.7)" },
+  coral:  { grad: "linear-gradient(180deg, #F4BBA8 0%, #F9D5C8 55%, #FCEAE2 100%)", solid: "#F6CBBB", topText: "#8A2E1E", topSub: "rgba(138,46,30,.85)", tabText: "#8A2E1E", pill: "rgba(138,46,30,.12)", profileBg: "rgba(138,46,30,.14)", banner: ["#F5C0AE", "#FBE6DD"], onBanner: "#8A2E1E", onBannerSub: "rgba(138,46,30,.85)" },
+  teal:   { grad: "linear-gradient(180deg, #A9E0DC 0%, #CCEFEC 55%, #E7F8F6 100%)", solid: "#BCE8E4", topText: "#0B5E58", topSub: "rgba(11,94,88,.85)", tabText: "#0B5E58", pill: "rgba(11,94,88,.12)", profileBg: "rgba(11,94,88,.14)", banner: ["#AEE2DD", "#E2F6F4"], onBanner: "#0B5E58", onBannerSub: "rgba(11,94,88,.85)" },
+  indigo: { grad: "linear-gradient(180deg, #2A2E5A 0%, #3A3F76 60%, #4A4F8C 100%)", solid: "#343A6E", topText: "#FFFFFF", topSub: "rgba(255,255,255,.82)", tabText: "#FFFFFF", pill: "rgba(255,255,255,.2)", profileBg: "rgba(255,255,255,.2)", banner: ["#343A6E", "#5258A0"], onBanner: "#FFFFFF", onBannerSub: "rgba(255,255,255,.82)" },
 };
+// لوحة الألوان المتدوّرة للأقسام (تبدأ بألوان فاتحة على هوية التطبيق؛ الكحلي لاحقاً)
+const PALETTE = [THEMES.mint, THEMES.peach, THEMES.sky, THEMES.lavender, THEMES.coral, THEMES.teal, THEMES.pink, THEMES.indigo];
+// إسناد لون حسب اسم القسم (كلمات مفتاحية) وإلا بالتدوير حسب الترتيب
+const THEME_HINTS = [
+  [/إلكترون|اجهزة|أجهزة|سماع|شحن|هاتف|كهربائ/, THEMES.indigo],
+  [/جمال|عناية|مكياج|تجميل|عطر|تجميلي/, THEMES.pink],
+  [/ديكور|منزل|أثاث|اثاث|مفروش|بيت/, THEMES.peach],
+  [/طفل|أطفال|اطفال|رضّع|بيبي|مومياز/, THEMES.sky],
+  [/خضار|فواكه|فواكة|طازج|عضوي/, THEMES.mint],
+  [/هدايا|هدية|مناسبات/, THEMES.lavender],
+  [/مستورد|مستوردة|عالمي|أجنبي/, THEMES.coral],
+  [/سناك|تسالي|شيبس|نقرشات|مقرمش/, THEMES.coral],
+  [/مشروب|عصير|ماء|مياه/, THEMES.teal],
+];
+function themeForCat(name = "", index = 0) {
+  const n = String(name);
+  for (const [re, t] of THEME_HINTS) if (re.test(n)) return t;
+  return PALETTE[index % PALETTE.length];
+}
 
 const FEATURED = [
   { title: "أساسيات الشتاء", grad: ["#2B5876", "#4E4376"], emoji: "🧥" },
@@ -128,6 +162,76 @@ const BEST_IMG = "https://placehold.co/100x100/F4F6F8/F4F6F8/png";
 const onImgErr = (e) => { e.currentTarget.style.visibility = "hidden"; };
 const iqd = (n) => Number(n).toLocaleString("en-US") + " د.ع";
 const clamp2 = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
+
+// اقتراحات بحث تتبدّل داخل شريط البحث (بنمط Blinkit الذي يدوّر الكلمات)
+const SEARCH_HINTS = ["مسواگ ولبن", "أجهزة المطبخ", "حليب وبيض", "شيبس وتسالي", "شامبو وصابون", "آيس كريم", "مشروبات غازية", "تمر وعسل", "خضار طازجة", "حفاظات أطفال"];
+
+// أيقونة مناسبة لكل قسم حسب اسمه (بدل أيقونة عامة واحدة لكل التبويبات)
+const ICON_HINTS = [
+  [/بقالة|سوبر|تموين|عامة|تسوق/, ShoppingBasket],
+  [/إلكترون|اجهزة|أجهزة|سماع|هاتف|كهربائ/, Headphones],
+  [/جمال|عناية|مكياج|تجميل|تجميلي/, Sparkles],
+  [/عطر|بخور/, Flower2],
+  [/ديكور|أثاث|اثاث|مفروش/, Lamp],
+  [/طفل|أطفال|اطفال|رضّع|بيبي/, Baby],
+  [/هدايا|هدية|مناسبات/, Gift],
+  [/خضار|فواكه|فواكة|طازج|عضوي/, Carrot],
+  [/لحوم|لحم|دجاج|أسماك|سمك|بروتين/, Drumstick],
+  [/ألبان|البان|حليب|بيض|جبن/, Milk],
+  [/مخبوز|خبز|صمون|كرواس|مخبوزات/, Croissant],
+  [/تسالي|سناك|شيبس|مكسرات|نقرشات/, Popcorn],
+  [/مشروب|عصير|ماء|مياه/, CupSoda],
+  [/قهوة|شاي/, Coffee],
+  [/حلوى|حلويات|شوكولا|شوكولاتة/, Candy],
+  [/تنظيف|منظف|غسيل|منظفات/, SprayCan],
+  [/حيوان|أليف|اليف|قطط|كلاب/, PawPrint],
+  [/دواء|صحة|فيتامين|مكمّل/, Pill],
+  [/قرطاسية|مكتب|أقلام|اقلام/, Pencil],
+  [/مطبخ|طبخ|أدوات|ادوات/, CookingPot],
+  [/ملابس|أزياء|ازياء|قماش/, Shirt],
+];
+function iconForCat(name = "") {
+  const n = String(name);
+  for (const [re, Icon] of ICON_HINTS) if (re.test(n)) return Icon;
+  return LayoutGrid;
+}
+
+/* شريط بحث بنمط Blinkit: نص اقتراح يتبدّل بحركة انزلاق + ميكروفون */
+function SearchField({ onClick }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((v) => v + 1), 2400);
+    return () => clearInterval(id);
+  }, []);
+  const hint = SEARCH_HINTS[i % SEARCH_HINTS.length];
+  return (
+    <button onClick={onClick} className="search-field search-wrap w-full flex items-center gap-2.5 rounded-xl px-3 text-start" style={{ background: "#FFFFFF", height: 46 }}>
+      <Search size={20} style={{ color: "#9AA3AF" }} />
+      <span className="flex-1 flex items-baseline gap-1.5 overflow-hidden" style={{ height: 22 }}>
+        <span className="text-sm font-medium shrink-0" style={{ color: "#9AA3AF" }}>دور على</span>
+        <span key={i} className="hint-word text-sm font-bold whitespace-nowrap" style={{ color: "#3A424E" }}>«{hint}»</span>
+      </span>
+      <Mic size={18} style={{ color: "#0C831F" }} />
+    </button>
+  );
+}
+
+/* بانر القسم الملوّن (بنمط بلنكت: REIMAGINE your space / TINY TOTS ZONE) */
+function CategoryBanner({ name, theme }) {
+  const e = emojiFor(name);
+  return (
+    <div className="cat-banner" style={{ background: linGrad(theme.banner, 180) }}>
+      <div className="max-w-6xl mx-auto px-5 pt-3 pb-7 relative">
+        <span className="cat-emoji-1 absolute" style={{ top: 12, insetInlineEnd: 14, fontSize: 60, opacity: 0.92, filter: "drop-shadow(0 6px 10px rgba(0,0,0,.14))" }}>{e}</span>
+        <div style={{ paddingInlineEnd: 80 }}>
+          <p className="cat-banner-sub text-xs font-extrabold tracking-wide" style={{ color: theme.onBannerSub }}>★ متجر مختار خصيصاً لك</p>
+          <h2 className="cat-banner-name font-black leading-tight mt-1" style={{ color: theme.onBanner, fontSize: 26 }}>{name}</h2>
+          <p className="cat-banner-sub text-sm font-bold mt-1.5" style={{ color: theme.onBannerSub }}>كل ما يخص {name} يوصلك بدقائق</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ================================================================== */
 /*  Presentational components (module-level => no remount on type)    */
@@ -236,7 +340,6 @@ function PromoBanner({ banner }) {
 /*  Home page                                                         */
 /* ================================================================== */
 export default function HomePage() {
-  const [search, setSearch] = useState("");
   const [addrId, setAddrId] = useState("samawah");
   const [locOpen, setLocOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
@@ -254,7 +357,6 @@ export default function HomePage() {
     return () => window.removeEventListener("resize", measure);
   }, [bannerOpen, loading]);
 
-  const theme = THEMES[activeTab] || THEMES.all;
   const address = ADDRESSES.find((a) => a.id === addrId);
   const remaining = Math.max(0, FREE_AT - subtotal);
   const c = { qty, add, inc, dec };
@@ -264,8 +366,11 @@ export default function HomePage() {
   const goCat = (id) => nav(`/category?cat=${id}`);
   // بطاقة مجموعة/متجر: تُفتح على الفئة بالاسم إن وُجدت، وإلا بحث
   const goCollection = (q) => { const c = cats.find((x) => x.name === q); c ? nav(`/category?cat=${c.id}`) : nav(`/search?q=${encodeURIComponent(q)}`); };
-  const catTabs = tier1.slice(0, 5).map((cobj) => ({ id: cobj.id, label: cobj.name, Icon: LayoutGrid }));
-  const tabs = [{ id: "all", label: "الكل", Icon: ShoppingBag }, ...catTabs];
+  // تبويبات أفقية قابلة للتمرير — لكل قسم أيقونته ولونه الخاص (بنمط بلنكت)
+  const catTabs = tier1.map((cobj, i) => ({ id: cobj.id, label: cobj.name, Icon: iconForCat(cobj.name), theme: themeForCat(cobj.name, i) }));
+  const tabs = [{ id: "all", label: "الكل", Icon: ShoppingBag, theme: THEMES.gold }, ...catTabs];
+  const activeTabObj = tabs.find((t) => t.id === activeTab) || tabs[0];
+  const theme = activeTabObj.theme || THEMES.gold;
   const bestsellers = tier1.slice(0, 6).map((cobj) => {
     const ps = byCat(cobj.id);
     const e = ps.slice(0, 4).map((p) => emojiFor(p.name));
@@ -287,15 +392,18 @@ export default function HomePage() {
       <div style={{ background: theme.grad }}>
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-3 relative">
           <div className="flex items-start justify-between gap-3">
-            <button onClick={() => setLocOpen((v) => !v)} className="min-w-0">
+            <button onClick={() => setLocOpen((v) => !v)} className="min-w-0 text-start">
               <p className="text-xs font-bold" style={{ color: theme.topSub }}>التوصيل خلال</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <h1 className="font-extrabold leading-none" style={{ color: theme.topText, fontSize: "30px" }}>16 دقيقة</h1>
+                <h1 className="font-black leading-none" style={{ color: theme.topText, fontSize: "30px" }}>16 دقيقة</h1>
                 <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2 py-0.5" style={{ background: theme.pill, color: theme.topText }}><Clock size={11} /> 24/7</span>
               </div>
-              <div className="flex items-center gap-1 mt-1.5">
-                <span className="text-sm font-bold truncate" style={{ color: theme.topText, maxWidth: "58vw" }}>{address.label} - {address.line}</span>
-                <ChevronDown size={16} style={{ color: theme.topText, transform: locOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+              <div className="flex items-center gap-1 mt-1.5" style={{ maxWidth: "62vw" }}>
+                <span className="text-sm truncate" style={{ color: theme.topText }}>
+                  <span style={{ fontWeight: 800 }}>{address.label}</span>
+                  <span style={{ opacity: 0.85 }}> - {address.line}</span>
+                </span>
+                <ChevronDown size={16} className="shrink-0" style={{ color: theme.topText, transform: locOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
               </div>
             </button>
             <div className="flex items-center gap-2 shrink-0 mt-0.5">
@@ -324,19 +432,15 @@ export default function HomePage() {
       {/* ===== STICKY: search + tabs (themed) ===== */}
       <div className="sticky top-0 z-30" style={{ background: theme.solid, boxShadow: "0 6px 14px rgba(20,20,20,.10)" }}>
         <div className="max-w-6xl mx-auto px-4 pt-2.5 pb-2">
-          <div className="search-wrap flex items-center gap-2.5 rounded-xl px-3" style={{ background: "#FFFFFF", height: 46 }}>
-            <Search size={20} style={{ color: "#9AA3AF" }} />
-            <input value={search} readOnly onClick={() => nav("/search")} placeholder="دور على مسواگ، لحم، خضار..." className="flex-1 bg-transparent outline-none text-sm font-medium" style={{ color: "#1A1A1A", cursor: "pointer" }} />
-            <Mic size={18} style={{ color: "#0C831F" }} />
-          </div>
+          <SearchField onClick={() => nav("/search")} />
           <div className="flex gap-1 overflow-x-auto no-scrollbar mt-2.5">
             {tabs.map((t) => {
               const on = activeTab === t.id;
               return (
-                <button key={t.id} onClick={() => setActiveTab(t.id)} className={"tab flex flex-col items-center gap-1 px-2 shrink-0" + (on ? " tab-active" : "")} style={{ minWidth: "4.2rem" }}>
-                  <t.Icon size={22} strokeWidth={2} style={{ color: theme.tabText }} />
-                  <span className="text-xs font-bold whitespace-nowrap" style={{ color: theme.tabText }}>{t.label}</span>
-                  <div style={{ height: 3, width: "75%", borderRadius: 3, background: on ? theme.tabText : "transparent" }} />
+                <button key={t.id} onClick={() => setActiveTab(t.id)} className={"tab flex flex-col items-center gap-1 px-1 shrink-0" + (on ? " tab-active" : "")} style={{ width: "4.6rem", opacity: on ? 1 : 0.62 }}>
+                  <t.Icon size={22} strokeWidth={on ? 2.6 : 2} className="shrink-0" style={{ color: theme.tabText }} />
+                  <span className="text-xs text-center leading-tight" style={{ ...clamp2, color: theme.tabText, fontWeight: on ? 800 : 600, minHeight: "2.2em" }}>{t.label}</span>
+                  <div style={{ height: 3, width: "70%", borderRadius: 3, background: on ? theme.tabText : "transparent" }} />
                 </button>
               );
             })}
@@ -347,14 +451,15 @@ export default function HomePage() {
       {/* ===== BODY ===== */}
       {activeTab === "all" ? (
         <>
-          <div className="welcome" style={{ borderBottomLeftRadius: 40, borderBottomRightRadius: 40 }}>
-            <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-center gap-4">
-              <span style={{ fontSize: "30px" }}>🛍️</span>
-              <div className="text-center">
-                <p className="welcome-title text-2xl font-extrabold">✦ أهلاً وسهلاً ✦</p>
-                <p className="text-sm font-semibold mt-1" style={{ opacity: 0.95 }}>اطلب الآن واستمتع بتوصيل مجاني</p>
+          <div className="welcome" style={{ borderEndStartRadius: 36, borderEndEndRadius: 36 }}>
+            <div className="max-w-6xl mx-auto px-5 py-5 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="welcome-title text-2xl font-black leading-tight">✦ أهلاً وسهلاً ✦</p>
+                <p className="text-sm font-semibold mt-1.5 flex items-center gap-1.5" style={{ opacity: 0.95 }}>
+                  <Bike size={16} className="shrink-0" /> توصيل مجاني على أول طلب
+                </p>
               </div>
-              <span style={{ fontSize: "30px" }}>🛍️</span>
+              <span className="cat-emoji-1 shrink-0" style={{ fontSize: 46, filter: "drop-shadow(0 8px 12px rgba(0,0,0,.25))" }}>🛵</span>
             </div>
           </div>
 
@@ -456,8 +561,9 @@ export default function HomePage() {
         <>
           {activeCat ? (
             <>
+              <CategoryBanner name={activeCat.name} theme={theme} />
               <section className="max-w-6xl mx-auto px-3 pt-5">
-                <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>{activeCat.name}</h2>
+                <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>تصفّح {activeCat.name}</h2>
                 <div className="grid grid-cols-4 lg:grid-cols-8 gap-2.5">
                   {[{ id: activeCat.id, name: "الكل" }, ...subsOf(activeCat.id)].map((item) => (
                     <button key={item.id} onClick={() => goCat(item.id)} className="cat-tile rounded-2xl p-1.5 flex flex-col items-center" style={{ background: "#F0F8FA" }}>
