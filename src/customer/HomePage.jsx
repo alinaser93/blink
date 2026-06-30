@@ -374,11 +374,11 @@ export default function HomePage() {
   const activeTabObj = tabs.find((t) => t.id === activeTab) || tabs[0];
   const theme = activeTabObj.theme || THEMES.gold;
   // بطاقات «الأكثر مبيعاً»: من إعدادات الأدمن إن وُجدت، وإلا اشتقاق تلقائي من الأقسام
-  const buildBestCard = (cobj, name, color, hero) => {
+  const buildBestCard = (cobj, name, color, emoji) => {
     const ps = byCat(cobj.id);
     const e = ps.slice(0, 4).map((p) => emojiFor(p.name));
-    while (e.length < 4) e.push(hero || "🛒");
-    return { id: cobj.id, name: name || cobj.name, count: ps.length, e, color: color || null };
+    while (e.length < 4) e.push("🛒");
+    return { id: cobj.id, name: name || cobj.name, count: ps.length, e, color: color || null, hero: emoji || null };
   };
   const cfgBestCards = (cfg.best.cards || [])
     .map((cd) => ({ cd, cobj: tier1.find((c) => c.id === cd.catId) }))
@@ -403,9 +403,9 @@ export default function HomePage() {
           <div className="flex items-start justify-between gap-3">
             <button onClick={() => setLocOpen((v) => !v)} className="min-w-0 text-start">
               <p className="text-xs font-bold" style={{ color: theme.topSub }}>{cfg.top.label}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <h1 className="font-black leading-none" style={{ color: theme.topText, fontSize: "30px" }}>{cfg.top.value}</h1>
-                {cfg.top.badge ? <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2 py-0.5" style={{ background: theme.pill, color: theme.topText }}><Clock size={11} /> {cfg.top.badge}</span> : null}
+              <div className="flex items-center gap-2 mt-0.5" style={{ maxWidth: "72vw" }}>
+                <h1 className="font-black leading-none truncate" style={{ color: theme.topText, fontSize: "30px" }}>{cfg.top.value}</h1>
+                {cfg.top.badge ? <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2 py-0.5 shrink-0" style={{ background: theme.pill, color: theme.topText }}><Clock size={11} /> {cfg.top.badge}</span> : null}
               </div>
               <div className="flex items-center gap-1 mt-1.5" style={{ maxWidth: "62vw" }}>
                 <span className="text-sm truncate" style={{ color: theme.topText }}>
@@ -485,7 +485,7 @@ export default function HomePage() {
                   {bestsellers.map((cd) => (
                     <button key={cd.id} onClick={() => goCat(cd.id)} className="best-card rounded-2xl p-2" style={cd.color ? { background: cd.color + "14", borderColor: cd.color + "33" } : undefined}>
                       <div className="grid grid-cols-2 gap-1">
-                        {[0, 1, 2, 3].map((i) => (<div key={i} className="img-box aspect-square rounded-md flex items-center justify-center" style={{ fontSize: 24 }}>{cd.e[i]}</div>))}
+                        {[0, 1, 2, 3].map((i) => (<div key={i} className="img-box aspect-square rounded-md flex items-center justify-center" style={{ fontSize: 24 }}>{cd.hero || cd.e[i]}</div>))}
                       </div>
                       <span className="best-pill inline-block mt-2 text-xs font-bold rounded-full px-2 py-0.5" style={cd.color ? { background: cd.color + "22", color: cd.color } : undefined}>{cd.count} منتج</span>
                       <p className="text-xs font-extrabold mt-1 leading-tight" style={{ color: "#1A1A1A" }}>{cd.name}</p>

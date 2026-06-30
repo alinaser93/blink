@@ -929,7 +929,7 @@ function ColorField({ label, value, onChange }) {
     <HField label={label}>
       <div className="flex items-center gap-2">
         <input type="color" value={value || "#000000"} onChange={(e) => onChange(e.target.value)} style={{ width: 44, height: 42, border: "1px solid #E6E9EE", borderRadius: 10, padding: 3, background: "#fff", cursor: "pointer" }} />
-        <input value={value || ""} onChange={(e) => onChange(e.target.value)} className="text-sm font-bold" style={{ ...hf, flex: 1, direction: "ltr", textAlign: "left" }} />
+        <input value={value || ""} onChange={(e) => onChange(e.target.value)} className="text-sm font-bold" style={{ ...hf, flex: 1, direction: "ltr", textAlign: "start" }} />
       </div>
     </HField>
   );
@@ -985,8 +985,8 @@ function HomeSettingsView({ config, cats, inv, onSave }) {
     return e;
   };
   const deptCount = (id) => inv.filter((p) => p.cat === nameOf(id)).length;
-  // بطاقات المعاينة: المضبوطة يدوياً، وإلا أول ٦ أقسام تلقائياً (مثل الصفحة الرئيسية)
-  const previewCards = cards.length ? cards : tier1.slice(0, 6).map((c) => ({ catId: c.id, name: "", color: CAT_ACCENT[c.name] || "#0C831F", emoji: "" }));
+  // بطاقات المعاينة: المضبوطة يدوياً، وإلا أول ٦ أقسام تلقائياً بلا لون (محايدة مثل الصفحة الرئيسية)
+  const previewCards = cards.length ? cards : tier1.slice(0, 6).map((c) => ({ catId: c.id, name: "", color: null, emoji: "" }));
 
   const save = async () => { setBusy(true); try { await onSave(draft); setSaved(true); setTimeout(() => setSaved(false), 2600); } catch (e) { console.error(e); alert("تعذّر الحفظ: " + (e.message || "")); } finally { setBusy(false); } };
   const resetAll = () => { if (window.confirm("استرجاع الإعدادات الافتراضية للصفحة الرئيسية؟")) setDraft(DEFAULT_HOME_CONFIG); };
@@ -1092,12 +1092,17 @@ function HomeSettingsView({ config, cats, inv, onSave }) {
               <div className="grid grid-cols-3 gap-2">
                 {previewCards.slice(0, 6).map((cd, i) => {
                   const e = deptEmojis(cd.catId);
+                  // نفس ألوان بطاقة الزبون: ملوّنة لو ضُبط لون، وإلا محايدة (best-card/best-pill)
+                  const cardBg = cd.color ? cd.color + "14" : "#F3F4F8";
+                  const cardBorder = cd.color ? cd.color + "33" : "#ECEEF3";
+                  const pillBg = cd.color ? cd.color + "22" : "#E7EAF0";
+                  const pillCol = cd.color || "#5A6473";
                   return (
-                    <div key={i} className="rounded-xl p-1.5" style={{ background: (cd.color || "#9AA8B5") + "14", border: "1px solid " + (cd.color || "#ECEEF3") + "33" }}>
+                    <div key={i} className="rounded-xl p-1.5" style={{ background: cardBg, border: "1px solid " + cardBorder }}>
                       <div className="grid grid-cols-2 gap-0.5">
                         {[0, 1, 2, 3].map((k) => <div key={k} className="rounded flex items-center justify-center" style={{ aspectRatio: "1/1", background: "#fff", fontSize: 15 }}>{cd.emoji || e[k]}</div>)}
                       </div>
-                      <span className="inline-block mt-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5" style={{ background: (cd.color || "#5A6473") + "22", color: cd.color || "#5A6473" }}>{deptCount(cd.catId)} منتج</span>
+                      <span className="inline-block mt-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5" style={{ background: pillBg, color: pillCol }}>{deptCount(cd.catId)} منتج</span>
                       <p className="text-[11px] font-extrabold mt-0.5 leading-tight">{cd.name || nameOf(cd.catId)}</p>
                     </div>
                   );
