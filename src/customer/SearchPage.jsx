@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCart } from "./cart.jsx";
 import { useCatalog } from "./catalog.js";
 import { emojiFor } from "./emoji.js";
@@ -107,8 +107,10 @@ function ProductCard({ p, qty, onAdd, onInc, onDec }) {
 /*  Search page                                                       */
 /* ================================================================== */
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [sp] = useSearchParams();
+  const initialQ = sp.get("q") || "";
+  const [query, setQuery] = useState(initialQ);
+  const [submitted, setSubmitted] = useState(!!initialQ);
   const [bannerOpen, setBannerOpen] = useState(true);
   const inputRef = useRef(null);
   const nav = useNavigate();

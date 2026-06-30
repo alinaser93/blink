@@ -103,6 +103,26 @@ const NAV = [
   { id: "cart", label: "السلة", Icon: ShoppingCart, to: "/cart" },
 ];
 
+// متاجر مميّزة + اختيارات تناسبك (بنمط Blinkit) — كل بطاقة تُفتح على فئة/قسم بالاسم
+const STORES = [
+  { title: "متجر الآيس كريم", emoji: "🍦", grad: ["#EE92BC", "#FBD0E2"], q: "آيس كريم والمزيد" },
+  { title: "متجر الإلكترونيات", emoji: "🎧", grad: ["#3A3F76", "#7A7FC0"], q: "إلكترونيات ومستلزمات" },
+  { title: "متجر الجمال والعناية", emoji: "💄", grad: ["#C2477F", "#EE92BC"], q: "الجمال والعناية الشخصية" },
+  { title: "متجر الحلويات", emoji: "🍫", grad: ["#7A4B2A", "#C9692E"], q: "حلويات وشوكولاتة" },
+  { title: "متجر المشروبات", emoji: "🥤", grad: ["#2B7A9B", "#7EC8E8"], q: "مشروبات وعصائر" },
+  { title: "متجر الألعاب", emoji: "🧸", grad: ["#C9692E", "#F0C088"], q: "ألعاب أطفال" },
+];
+const PICKS = [
+  { title: "ركن الحيوانات الأليفة", emoji: "🐾", bg: "#EAF6FC" , q: "العناية بالحيوانات" },
+  { title: "الفطور والحبوب", emoji: "🥣", bg: "#FBF4E7", q: "مكسرات وحبوب الفطور" },
+  { title: "الشاي والقهوة", emoji: "☕", bg: "#F1ECE6", q: "شاي وقهوة وحليب" },
+  { title: "الصحة والدواء", emoji: "💊", bg: "#EAF6EC", q: "الصحة والدواء" },
+  { title: "العناية بالطفل", emoji: "🍼", bg: "#FCEAF2", q: "العناية بالطفل" },
+  { title: "التنظيف والغسيل", emoji: "🧼", bg: "#EEF2FF", q: "منظفات الغسيل" },
+  { title: "القرطاسية والمكتب", emoji: "✏️", bg: "#F6ECDD", q: "قرطاسية ومكتب" },
+  { title: "المكسرات والتسالي", emoji: "🥜", bg: "#F3EEF9", q: "شيبس وتسالي" },
+];
+
 const FREE_AT = 15000;
 const BEST_IMG = "https://placehold.co/100x100/F4F6F8/F4F6F8/png";
 const onImgErr = (e) => { e.currentTarget.style.visibility = "hidden"; };
@@ -223,7 +243,7 @@ export default function HomePage() {
   const [bannerOpen, setBannerOpen] = useState(true);
   const nav = useNavigate();
   const { qty, add, inc, dec, subtotal, count } = useCart();
-  const { loading, tier1, subsOf, byCat } = useCatalog();
+  const { loading, tier1, subsOf, byCat, cats } = useCatalog();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(150);
@@ -242,6 +262,8 @@ export default function HomePage() {
   // ===== كل تصنيفات الكتالوج من لوحة الأدمن (أقسام + تفرّعات + منتجات) =====
   const openProduct = (p) => nav(`/product?id=${p.id}`);
   const goCat = (id) => nav(`/category?cat=${id}`);
+  // بطاقة مجموعة/متجر: تُفتح على الفئة بالاسم إن وُجدت، وإلا بحث
+  const goCollection = (q) => { const c = cats.find((x) => x.name === q); c ? nav(`/category?cat=${c.id}`) : nav(`/search?q=${encodeURIComponent(q)}`); };
   const catTabs = tier1.slice(0, 5).map((cobj) => ({ id: cobj.id, label: cobj.name, Icon: LayoutGrid }));
   const tabs = [{ id: "all", label: "الكل", Icon: ShoppingBag }, ...catTabs];
   const bestsellers = tier1.slice(0, 6).map((cobj) => {
@@ -393,9 +415,35 @@ export default function HomePage() {
                 </div>
               </section>
 
+              {/* متاجر مميّزة (Stores in spotlight) */}
+              <section className="max-w-6xl mx-auto px-3 pt-7">
+                <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>متاجر مميّزة</h2>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                  {STORES.map((s) => (
+                    <button key={s.title} onClick={() => goCollection(s.q)} className="feat-card shrink-0 relative rounded-2xl overflow-hidden text-start" style={{ width: 152, height: 108, background: linGrad(s.grad, 150) }}>
+                      <p className="absolute text-sm font-extrabold leading-tight" style={{ top: 12, insetInlineStart: 12, insetInlineEnd: 44, color: "#fff" }}>{s.title}</p>
+                      <span className="absolute" style={{ bottom: 8, insetInlineEnd: 10, fontSize: 40 }}>{s.emoji}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
               {feeds.slice(2, 4).map((f) => (
                 <Feed key={f.cobj.id} title={f.cobj.name} items={f.items} accent={f.items[0] && f.items[0].accent} c={c} onOpen={openProduct} onSeeAll={() => goCat(f.cobj.id)} />
               ))}
+              {/* اختيارات تناسبك (Picks for your lifestyle) */}
+              <section className="max-w-6xl mx-auto px-3 pt-7">
+                <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>اختيارات تناسب أسلوبك</h2>
+                <div className="grid grid-cols-4 gap-2.5">
+                  {PICKS.map((p) => (
+                    <button key={p.title} onClick={() => goCollection(p.q)} className="cat-tile rounded-2xl p-2 flex flex-col items-center" style={{ background: p.bg }}>
+                      <div className="w-full aspect-square flex items-center justify-center" style={{ fontSize: 30 }}>{p.emoji}</div>
+                      <span className="text-xs font-bold text-center leading-tight mt-0.5" style={{ color: "#2A2F36", minHeight: "2.4em" }}>{p.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
               <PromoBanner banner={BANNER} />
               {feeds.slice(4).map((f) => (
                 <Feed key={f.cobj.id} title={f.cobj.name} items={f.items} accent={f.items[0] && f.items[0].accent} c={c} onOpen={openProduct} onSeeAll={() => goCat(f.cobj.id)} />
