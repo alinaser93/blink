@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LayoutDashboard, Activity, Boxes, Users, BarChart3, Wallet, Clock, AlertTriangle,
   Bike, Bell, Search, Plus, Pencil, Package, CheckCircle2, Settings, Store,
   TrendingUp, ShoppingCart, UserPlus, ArrowUpRight, Minus, Loader2, Menu,
   FolderTree, Folder, ChevronUp, ChevronDown, Trash2, Check, X,
+  Download, Upload, FileSpreadsheet, FileJson, AlertCircle,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -12,7 +13,7 @@ import {
 import {
   getProducts, getOrders, getCustomers, getRiders, setOrderStatus, setStock, isLive,
   getCategories, createCategory, updateCategory, deleteCategory, reorderCategory,
-  createProduct, updateProduct, deleteProduct,
+  createProduct, updateProduct, deleteProduct, importCatalog,
   ICON_MAP, CAT_ICON, CAT_ACCENT, CATEGORY_ICONS,
 } from "../lib/api.js";
 import { emojiFor } from "../customer/emoji.js";
@@ -262,6 +263,206 @@ function OrdersView({ orders, inv, riders, accept, ready, deliver }) {
   );
 }
 
+/* ================================================================== */
+/*  استيراد/تصدير الكتالوج (CSV + JSON) — بمعايير المتاجر الكبرى       */
+/* ================================================================== */
+// أعمدة الكتالوج: العنوان المعروض + مرادفات للاستيراد. مطابقة العناوين مرنة
+// (تتجاهل حالة الأحرف والتطويل والحركات والمسافات) كي تقبل ملفات إكسل المعدّلة يدوياً.
+const normKey = (s) => String(s == null ? "" : s).trim().toLowerCase()
+  .replace(/ـ/g, "")                  // تطويل ـ
+  .replace(/[ً-ْٰ]/g, "")   // حركات/شدّة
+  .replace(/\s+/g, " ");
+const IE_COLS = [
+  { key: "cat",    header: "القسم",           aliases: ["قسم", "category", "cat"] },
+  { key: "sub",    header: "التفرّع",         aliases: ["تفرّع", "subcategory", "sub"] },
+  { key: "name",   header: "اسم المنتج",      aliases: ["الاسم", "المنتج", "name", "product", "title"] },
+  { key: "weight", header: "الوحدة",          aliases: ["unit", "weight", "size"] },
+  { key: "price",  header: "السعر",           aliases: ["price"] },
+  { key: "mrp",    header: "السعر قبل الخصم", aliases: ["قبل الخصم", "mrp"] },
+  { key: "stock",  header: "المخزون",         aliases: ["الكمية المتوفرة", "stock", "quantity", "qty"] },
+  { key: "emoji",  header: "إيموجي",          aliases: ["ايموجي", "emoji", "icon"] },
+];
+const EXPORT_HEADERS = IE_COLS.map((c) => c.header);
+const HMAP = {};
+IE_COLS.forEach((c) => [c.header, ...c.aliases].forEach((a) => { HMAP[normKey(a)] = c.key; }));
+const csvCell = (v) => {
+  let s = v == null ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;   // منع حقن الصيغ في إكسل (CSV injection)
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+};
+function toCSV(headers, rows) {
+  return [headers.map(csvCell).join(",")].concat(rows.map((r) => r.map(csvCell).join(","))).join("\n");
+}
+function parseCSV(text) {
+  const rows = []; let row = []; let field = ""; let inQ = false;
+  text = text.replace(/^﻿/, "");
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ",") { row.push(field); field = ""; }
+    else if (ch === "\r") { /* skip */ }
+    else if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+}
+const normalizeRow = (obj) => {
+  const out = {};
+  if (!obj || typeof obj !== "object") return out;
+  Object.keys(obj).forEach((k) => { const key = HMAP[normKey(k)]; if (key) out[key] = obj[k]; });
+  return out;
+};
+// يحوّل نصّ ملف (CSV أو JSON) إلى صفوف موحّدة + أخطاء (لا يرمي استثناءً أبداً)
+function parseImport(text) {
+  const t = text.trim();
+  if (t.startsWith("{") || t.startsWith("[")) {
+    let data;
+    try { data = JSON.parse(t); } catch (e) { return { rows: [], errors: ["JSON غير صالح: " + (e.message || "")] }; }
+    const raw = Array.isArray(data) ? data : (data.products || data.rows || data.items || []);
+    return { rows: (Array.isArray(raw) ? raw : []).map(normalizeRow), errors: [] };
+  }
+  const grid = parseCSV(t);
+  if (!grid.length) return { rows: [], errors: ["الملف فارغ"] };
+  const headers = grid[0].map((h) => h.trim());
+  const rows = grid.slice(1).map((cells) => {
+    const obj = {}; headers.forEach((h, i) => { obj[h] = cells[i] != null ? cells[i] : ""; });
+    return normalizeRow(obj);
+  });
+  return { rows, errors: [] };
+}
+const productsToRows = (inv) => inv.map((p) => [p.cat || "", p.sub || "", p.name, p.weight || "", p.price, p.mrp || "", p.stock, p.emoji || ""]);
+function buildCatalogJSON(inv, cats) {
+  const nameOf = (id) => { const c = cats.find((x) => x.id === id); return c ? c.name : null; };
+  return JSON.stringify({
+    app: "salla", version: 1, exportedAt: new Date().toISOString(),
+    categories: cats.map((c) => ({ name: c.name, parent: c.parentId ? nameOf(c.parentId) : null, sort: c.sort, icon: c.iconName || null })),
+    products: inv.map((p) => ({ category: p.cat || "", subcategory: p.sub || null, name: p.name, unit: p.weight || "", price: p.price, mrp: p.mrp || 0, stock: p.stock, emoji: p.emoji || null })),
+  }, null, 2);
+}
+function downloadFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime + ";charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+// معاينة قبل التأكيد — تطابق منطق importCatalog تماماً (المطابقة بـ معرّف القسم + الاسم)
+function importPreview(rows, inv, cats) {
+  const nameOf = (id) => { const c = cats.find((x) => x.id === id); return c ? c.name : ""; };
+  const findT1 = (n) => cats.find((c) => c.parentId == null && c.name === n);
+  const findSub = (pid, n) => cats.find((c) => c.parentId === pid && c.name === n);
+  const t1Names = new Set(cats.filter((c) => c.parentId == null).map((c) => c.name));
+  const subKeys = new Set(cats.filter((c) => c.parentId != null).map((c) => nameOf(c.parentId) + "|" + c.name));
+  // معرّف القسم للصف: قائم → معرّفه الحقيقي؛ جديد → سِمة وهمية لا تطابق أي منتج قائم؛ بلا قسم → null
+  const resolveId = (cat, sub) => {
+    if (!cat) return null;
+    const t1 = findT1(cat);
+    if (!t1) return "NEW|" + cat + "|" + sub;
+    if (!sub) return t1.id;
+    const s = findSub(t1.id, sub);
+    return s ? s.id : "NEW|" + cat + "|" + sub;
+  };
+  const prodSet = new Set(inv.map((p) => String(p.categoryId) + "|" + p.name));
+  const newCats = new Set(), newSubs = new Set();
+  let toCreate = 0, toUpdate = 0, invalid = 0;
+  for (const r of rows) {
+    const name = (r.name || "").trim(); if (!name) { invalid++; continue; }
+    const cat = (r.cat || "").trim(), sub = (r.sub || "").trim();
+    if (cat && !t1Names.has(cat)) newCats.add(cat);
+    if (cat && sub && !subKeys.has(cat + "|" + sub)) newSubs.add(cat + "|" + sub);
+    if (prodSet.has(String(resolveId(cat, sub)) + "|" + name)) toUpdate++; else toCreate++;
+  }
+  return { total: rows.length, newCats: newCats.size, newSubs: newSubs.size, toCreate, toUpdate, invalid };
+}
+
+/* ---- نافذة الاستيراد: معاينة ثم تأكيد ---- */
+function ImportModal({ data, onConfirm, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const p = data.preview;
+  const Stat = ({ n, label, color }) => (
+    <div className="rounded-xl p-3 text-center" style={{ background: "#F7F8FA" }}>
+      <p className="text-2xl font-extrabold tabular-nums" style={{ color }}>{n}</p>
+      <p className="text-xs font-bold mt-0.5" style={{ color: "#7A8493" }}>{label}</p>
+    </div>
+  );
+  const confirm = async () => {
+    setBusy(true);
+    try { const r = await onConfirm(data.rows); setResult(r); }
+    catch (e) { setResult({ error: e.message || "فشل الاستيراد" }); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="ovfade fixed inset-0 flex items-end sm:items-center justify-center" style={{ background: "rgba(16,24,40,.5)", zIndex: 90 }} onClick={busy ? undefined : onClose}>
+      <div className="panel rounded-2xl w-full" style={{ maxWidth: 520, maxHeight: "92vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5" style={{ borderBottom: "1px solid #F1F2F4" }}>
+          <h2 className="text-lg font-extrabold flex items-center gap-2"><Upload size={19} style={{ color: "#0C831F" }} /> استيراد الكتالوج</h2>
+          <button onClick={onClose} disabled={busy} className="icon-btn rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, background: "#F1F3F6", opacity: busy ? 0.5 : 1 }}><X size={18} /></button>
+        </div>
+        <div className="p-5">
+          {result ? (
+            result.error ? (
+              <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: "#FDECEC" }}>
+                <AlertCircle size={20} style={{ color: "#E11D2A" }} />
+                <p className="text-sm font-bold" style={{ color: "#B3261E" }}>{result.error}</p>
+              </div>
+            ) : (
+              <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: "#EAF6EC" }}>
+                <CheckCircle2 size={22} style={{ color: "#0C831F" }} />
+                <div className="text-sm font-bold" style={{ color: "#0A6A19" }}>
+                  تمّ الاستيراد بنجاح ✅
+                  <p className="text-xs font-semibold mt-1" style={{ color: "#3A7A48" }}>
+                    {result.productsCreated} منتج جديد · {result.productsUpdated} محدّث · {result.categoriesCreated} قسم · {result.subCreated} تفرّع{result.failed > 0 ? " · " + result.failed + " فشل" : ""}
+                  </p>
+                </div>
+              </div>
+            )
+          ) : (
+            <>
+              <p className="text-sm mb-4" style={{ color: "#5A6473" }}>راجع ما سيحدث قبل التأكيد. لن يُكرَّر أي منتج موجود — سيُحدَّث بدلاً من ذلك.</p>
+              {data.errors && data.errors.length > 0 && (
+                <div className="rounded-xl p-3 mb-3 flex items-start gap-2" style={{ background: "#FDECEC" }}>
+                  <AlertCircle size={17} style={{ color: "#E11D2A" }} />
+                  <p className="text-xs font-bold" style={{ color: "#B3261E" }}>{data.errors.join(" · ")}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <Stat n={p.toCreate} label="منتج جديد" color="#0C831F" />
+                <Stat n={p.toUpdate} label="منتج سيُحدَّث" color="#2563EB" />
+                <Stat n={p.newCats} label="قسم جديد" color="#B8932E" />
+                <Stat n={p.newSubs} label="تفرّع جديد" color="#7A5AB8" />
+              </div>
+              {p.invalid > 0 && (
+                <div className="rounded-xl p-3 mt-3 flex items-center gap-2" style={{ background: "#FEF3E2" }}>
+                  <AlertTriangle size={17} style={{ color: "#D98A1F" }} />
+                  <p className="text-xs font-bold" style={{ color: "#9A6B1E" }}>{p.invalid} صفّ بلا اسم منتج سيُتجاهَل.</p>
+                </div>
+              )}
+              {p.total === 0 && <p className="text-sm text-center py-4" style={{ color: "#AEB6BF" }}>لا توجد صفوف صالحة في الملف.</p>}
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-3 p-5" style={{ borderTop: "1px solid #F1F2F4" }}>
+          {result ? (
+            <button onClick={onClose} className="btn-green rounded-xl flex-1 text-sm font-extrabold" style={{ padding: "12px" }}>تمّ</button>
+          ) : (
+            <>
+              <button onClick={confirm} disabled={busy || p.total === 0} className="btn-green rounded-xl flex-1 flex items-center justify-center gap-2 text-sm font-extrabold" style={{ padding: "12px", opacity: busy || p.total === 0 ? 0.6 : 1 }}>
+                {busy ? <><Loader2 size={17} className="spin" /> جاري الاستيراد…</> : <><Check size={17} /> تأكيد الاستيراد</>}
+              </button>
+              <button onClick={onClose} disabled={busy} className="btn-ghost rounded-xl text-sm font-extrabold" style={{ padding: "12px 22px" }}>إلغاء</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---- نموذج إضافة/تعديل منتج (مربوط بالقسم/التفرّع) ---- */
 function ProductForm({ product, cats, onSave, onClose }) {
   const tier1 = cats.filter((c) => c.parentId == null).sort((a, b) => a.sort - b.sort);
@@ -337,10 +538,33 @@ function ProductForm({ product, cats, onSave, onClose }) {
   );
 }
 
-function InventoryView({ inv, cats, onAdjust, onAdd, onEdit, onDelete }) {
+function InventoryView({ inv, cats, onAdjust, onAdd, onEdit, onDelete, onImport }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("الكل");
   const [editing, setEditing] = useState(null); // product | "new" | null
+  const [expOpen, setExpOpen] = useState(false);
+  const [imp, setImp] = useState(null); // { rows, errors, preview } | null
+  const fileRef = useRef(null);
+
+  const exportCSV = () => { setExpOpen(false); downloadFile("salla-products.csv", "﻿" + toCSV(EXPORT_HEADERS, productsToRows(inv)), "text/csv"); };
+  const exportJSON = () => { setExpOpen(false); downloadFile("salla-catalog.json", buildCatalogJSON(inv, cats), "application/json"); };
+  const onFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = ""; // يسمح بإعادة اختيار نفس الملف
+    if (!f) return;
+    const emptyPrev = { total: 0, newCats: 0, newSubs: 0, toCreate: 0, toUpdate: 0, invalid: 0 };
+    if (f.size > 5 * 1024 * 1024) { setImp({ rows: [], errors: ["الملف كبير جداً (الحدّ الأقصى 5 ميغابايت)"], preview: emptyPrev }); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const { rows, errors } = parseImport(String(reader.result || ""));
+        setImp({ rows, errors, preview: importPreview(rows, inv, cats) });
+      } catch (err) {
+        setImp({ rows: [], errors: ["تعذّر قراءة الملف: " + (err.message || "صيغة غير صالحة")], preview: { total: 0, newCats: 0, newSubs: 0, toCreate: 0, toUpdate: 0, invalid: 0 } });
+      }
+    };
+    reader.readAsText(f);
+  };
 
   const catIndex = useMemo(() => { const m = {}; cats.forEach((c) => { m[c.id] = c; }); return m; }, [cats]);
   const resolveCat = (p) => {
@@ -367,10 +591,24 @@ function InventoryView({ inv, cats, onAdjust, onAdd, onEdit, onDelete }) {
           <div className="flex items-center gap-2 flex-wrap">
             {chips.map((c) => <button key={c} onClick={() => setCat(c)} className={"chip-f rounded-full text-xs font-bold " + (cat === c ? "on" : "")} style={{ padding: "7px 14px" }}>{c}</button>)}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="rounded-lg flex items-center gap-2 px-3" style={{ border: "1px solid #E6E9EE", height: 40 }}>
-              <Search size={16} style={{ color: "#9AA3AF" }} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث عن منتج..." className="bg-transparent outline-none text-sm" style={{ width: 130 }} />
+              <Search size={16} style={{ color: "#9AA3AF" }} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="بحث عن منتج..." className="bg-transparent outline-none text-sm" style={{ width: 120 }} />
             </div>
+            <div className="relative">
+              <button onClick={() => setExpOpen((v) => !v)} className="btn-ghost rounded-lg flex items-center gap-1.5 text-sm font-bold" style={{ padding: "9px 13px" }}><Download size={16} /> تصدير<ChevronDown size={14} /></button>
+              {expOpen && (
+                <>
+                  <div className="fixed inset-0" style={{ zIndex: 70 }} onClick={() => setExpOpen(false)} />
+                  <div className="panel rounded-xl absolute" style={{ insetInlineEnd: 0, top: 46, zIndex: 71, minWidth: 200, overflow: "hidden" }}>
+                    <button onClick={exportCSV} className="tbl-row w-full flex items-center gap-2 px-4 py-3 text-sm font-bold" style={{ color: "#3A424E" }}><FileSpreadsheet size={16} style={{ color: "#0C831F" }} /> ملف CSV (إكسل)</button>
+                    <button onClick={exportJSON} className="tbl-row w-full flex items-center gap-2 px-4 py-3 text-sm font-bold" style={{ color: "#3A424E", borderTop: "1px solid #F1F2F4" }}><FileJson size={16} style={{ color: "#2563EB" }} /> نسخة JSON كاملة</button>
+                  </div>
+                </>
+              )}
+            </div>
+            <button onClick={() => fileRef.current && fileRef.current.click()} className="btn-ghost rounded-lg flex items-center gap-1.5 text-sm font-bold" style={{ padding: "9px 13px" }}><Upload size={16} /> استيراد</button>
+            <input ref={fileRef} type="file" accept=".csv,.json,text/csv,application/json" onChange={onFile} style={{ display: "none" }} />
             <button onClick={() => setEditing("new")} className="btn-green rounded-lg flex items-center gap-2 text-sm font-extrabold" style={{ padding: "9px 16px" }}><Plus size={17} /> إضافة منتج</button>
           </div>
         </div>
@@ -421,6 +659,8 @@ function InventoryView({ inv, cats, onAdjust, onAdd, onEdit, onDelete }) {
           onSave={(data) => { if (editing === "new") onAdd(data); else onEdit(editing.id, data); setEditing(null); }}
         />
       )}
+
+      {imp && <ImportModal data={imp} onConfirm={onImport} onClose={() => setImp(null)} />}
     </>
   );
 }
@@ -793,6 +1033,14 @@ export default function AdminDashboard() {
     setInv((a) => a.filter((p) => p.id !== id));
     deleteProduct(id).catch((e) => { console.error(e); setInv(prev); });
   };
+  // استيراد جماعي: ينشئ الأقسام/التفرّعات الناقصة ويعمل Upsert للمنتجات، ثم يحدّث الحالة
+  const importProducts = async (rows) => {
+    const { categories, products, stats } = await importCatalog(rows);
+    setCats(categories);
+    setInv(products);
+    setSelT1((s) => s || categories.find((x) => x.parentId == null)?.id || null);
+    return stats;
+  };
 
   const head = HEAD[active];
 
@@ -860,7 +1108,7 @@ export default function AdminDashboard() {
             <>
               {active === "dash" && <OverviewView orders={orders} />}
               {active === "orders" && <OrdersView orders={orders} inv={inv} riders={riders} accept={accept} ready={ready} deliver={deliver} />}
-              {active === "inv" && <InventoryView inv={inv} cats={cats} onAdjust={onAdjust} onAdd={addProduct} onEdit={editProduct} onDelete={removeProduct} />}
+              {active === "inv" && <InventoryView inv={inv} cats={cats} onAdjust={onAdjust} onAdd={addProduct} onEdit={editProduct} onDelete={removeProduct} onImport={importProducts} />}
               {active === "cats" && <CategoriesView cats={cats} inv={inv} selT1={selT1} setSelT1={setSelT1} onAdd={addCat} onEdit={editCat} onDelete={removeCat} onMove={moveCat} />}
               {active === "cust" && <CustomersView customers={customers} />}
               {active === "analytics" && <AnalyticsView />}

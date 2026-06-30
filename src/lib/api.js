@@ -186,6 +186,72 @@ export async function deleteProduct(id) {
   if (error) throw error;
 }
 
+/* ============================ استيراد/تصدير الكتالوج ============================ */
+/*  importCatalog(rows): يضمن وجود الأقسام/التفرّعات (بالاسم)، ثم Upsert للمنتجات
+ *  بمطابقة (الاسم + القسم/التفرّع). يعمل في الوضعين، ويعيد كتالوجاً محدّثاً + إحصاء.
+ *  rows: [{ cat, sub, name, weight, price, mrp, stock, emoji }]                       */
+
+// تحويل الأرقام العربية إلى لاتينية ثم إلى عدد صحيح غير سالب (السعر/المخزون أعداد صحيحة)
+const toNum = (v) => {
+  if (v == null || v === "") return 0;
+  const s = String(v).replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[^\d.-]/g, "");
+  const n = parseFloat(s);                 // parseFloat ثم تقريب كي لا نفقد الكسور كما يفعل parseInt
+  return isNaN(n) ? 0 : Math.max(0, Math.round(n));
+};
+// تنظيف نصّ: إزالة محارف التحكّم، قصّ، وحدّ أقصى للطول (حماية من مدخلات مفسِدة)
+const clampText = (s, max = 120) => String(s == null ? "" : s).replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, max);
+
+export async function importCatalog(rows) {
+  const stats = { categoriesCreated: 0, subCreated: 0, productsCreated: 0, productsUpdated: 0, skipped: 0, failed: 0 };
+  let cats = await getCategories();
+  const findT1 = (n) => cats.find((c) => c.parentId == null && c.name === n);
+  const findSub = (pid, n) => cats.find((c) => c.parentId === pid && c.name === n);
+
+  // 1) ضمان الأقسام والتفرّعات الناقصة (بالاسم) — تسلسلياً كي لا تتكرّر، مع عزل أخطاء كل صفّ
+  for (const r of rows) {
+    const catName = clampText(r.cat);
+    if (!catName) continue;
+    try {
+      let t1 = findT1(catName);
+      if (!t1) { t1 = await createCategory({ name: catName }); cats.push(t1); stats.categoriesCreated++; }
+      const subName = clampText(r.sub);
+      if (subName && !findSub(t1.id, subName)) {
+        const s = await createCategory({ name: subName, parentId: t1.id });
+        cats.push(s); stats.subCreated++;
+      }
+    } catch (e) { console.error("فشل إنشاء قسم/تفرّع:", catName, e); }
+  }
+
+  // 2) Upsert للمنتجات (المطابقة بالاسم + معرّف القسم/التفرّع)
+  const resolveCatId = (r) => {
+    const catName = clampText(r.cat);
+    if (!catName) return null;
+    const t1 = findT1(catName); if (!t1) return null;
+    const subName = clampText(r.sub);
+    if (subName) { const s = findSub(t1.id, subName); return s ? s.id : t1.id; }
+    return t1.id;
+  };
+  let prods = await getProducts();
+  for (const r of rows) {
+    const name = clampText(r.name);
+    if (!name) { stats.skipped++; continue; }
+    try {
+      const categoryId = resolveCatId(r);
+      const fields = {
+        name, categoryId,
+        price: toNum(r.price), stock: toNum(r.stock), mrp: toNum(r.mrp),
+        weight: clampText(r.weight, 40),
+        emoji: (r.emoji || "").trim() || null,
+      };
+      const existing = prods.find((p) => p.name === name && p.categoryId === categoryId);
+      if (existing) { await updateProduct(existing.id, fields); stats.productsUpdated++; }
+      else { const created = await createProduct(fields); if (created) prods.push(created); stats.productsCreated++; }
+    } catch (e) { console.error("فشل استيراد منتج:", name, e); stats.failed++; }
+  }
+
+  return { categories: await getCategories(), products: await getProducts(), stats };
+}
+
 /* ============================ الأقسام (شجرة من مستويين) ============================ */
 /*  parentId=null قسم رئيسي، وغيره تفرّع. الشكل الموحّد: {id,name,parentId,iconName,sort} */
 
