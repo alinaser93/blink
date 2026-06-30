@@ -5,6 +5,7 @@ import {
   TrendingUp, ShoppingCart, UserPlus, ArrowUpRight, Minus, Loader2, Menu,
   FolderTree, Folder, ChevronUp, ChevronDown, Trash2, Check, X,
   Download, Upload, FileSpreadsheet, FileJson, AlertCircle,
+  Home, RotateCcw, Eye, Palette,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -14,6 +15,7 @@ import {
   getProducts, getOrders, getCustomers, getRiders, setOrderStatus, setStock, isLive,
   getCategories, createCategory, updateCategory, deleteCategory, reorderCategory,
   createProduct, updateProduct, deleteProduct, importCatalog,
+  getHomeConfig, saveHomeConfig, DEFAULT_HOME_CONFIG,
   ICON_MAP, CAT_ICON, CAT_ACCENT, CATEGORY_ICONS,
 } from "../lib/api.js";
 import { emojiFor } from "../customer/emoji.js";
@@ -76,6 +78,7 @@ const NAV = [
   { id: "orders", label: "الطلبات الحية", Icon: Activity },
   { id: "inv", label: "المنتجات والمخزون", Icon: Boxes },
   { id: "cats", label: "الأقسام", Icon: FolderTree },
+  { id: "home", label: "واجهة الصفحة الرئيسية", Icon: Home },
   { id: "cust", label: "العملاء", Icon: Users },
   { id: "analytics", label: "التقارير", Icon: BarChart3 },
 ];
@@ -84,6 +87,7 @@ const HEAD = {
   orders: { t: "الطلبات الحية", s: "تشغيل الطلبات لحظة بلحظة" },
   inv: { t: "المنتجات والمخزون", s: "إدارة المنتجات وحالة التوفّر" },
   cats: { t: "الأقسام", s: "إدارة شجرة الأقسام الرئيسية والفرعية" },
+  home: { t: "واجهة الصفحة الرئيسية", s: "تحكّم برأس صفحة الزبون: الترويسة وبانر الترحيب وبطاقات الأكثر مبيعاً" },
   cust: { t: "العملاء", s: "قاعدة عملاء الفرع" },
   analytics: { t: "التقارير والتحليلات", s: "أداء المبيعات والطلبات" },
 };
@@ -913,6 +917,200 @@ function CategoriesView({ cats, inv, selT1, setSelT1, onAdd, onEdit, onDelete, o
   );
 }
 
+/* ================================================================== */
+/*  واجهة الصفحة الرئيسية — تحكّم برأس صفحة الزبون (نص/ألوان/إيموجي)     */
+/* ================================================================== */
+const hf = { border: "1px solid #E6E9EE", height: 42, borderRadius: 10, padding: "0 12px", outline: "none", background: "#fff", width: "100%" };
+function HField({ label, hint, children }) {
+  return <div><label className="text-xs font-bold mb-1 block" style={{ color: "#5A6473" }}>{label}{hint && <span className="font-medium" style={{ color: "#AEB6BF" }}> — {hint}</span>}</label>{children}</div>;
+}
+function ColorField({ label, value, onChange }) {
+  return (
+    <HField label={label}>
+      <div className="flex items-center gap-2">
+        <input type="color" value={value || "#000000"} onChange={(e) => onChange(e.target.value)} style={{ width: 44, height: 42, border: "1px solid #E6E9EE", borderRadius: 10, padding: 3, background: "#fff", cursor: "pointer" }} />
+        <input value={value || ""} onChange={(e) => onChange(e.target.value)} className="text-sm font-bold" style={{ ...hf, flex: 1, direction: "ltr", textAlign: "left" }} />
+      </div>
+    </HField>
+  );
+}
+function SettingCard({ icon: Ic, title, sub, right, children }) {
+  return (
+    <div className="panel rounded-2xl p-5">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2.5">
+          <span className="rounded-xl flex items-center justify-center shrink-0" style={{ width: 38, height: 38, background: "#EAF6EC" }}><Ic size={19} style={{ color: "#0C831F" }} /></span>
+          <div><h3 className="text-base font-extrabold leading-none">{title}</h3>{sub && <p className="text-xs mt-1" style={{ color: "#9AA3AF" }}>{sub}</p>}</div>
+        </div>
+        {right}
+      </div>
+      {children}
+    </div>
+  );
+}
+function MiniToggle({ on, onClick }) {
+  return (
+    <button onClick={onClick} className="toggle-track rounded-full shrink-0" style={{ width: 44, height: 25, background: on ? "#0C831F" : "#C7CDD6", padding: 3, justifyContent: on ? "flex-start" : "flex-end" }}>
+      <span className="toggle-knob block rounded-full" style={{ width: 19, height: 19, background: "#fff" }} />
+    </button>
+  );
+}
+
+function HomeSettingsView({ config, cats, inv, onSave }) {
+  const tier1 = cats.filter((c) => c.parentId == null).sort((a, b) => a.sort - b.sort);
+  const [draft, setDraft] = useState(config);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  // مزامنة المسودّة عند وصول الإعداد من الـ API بعد التحميل
+  useEffect(() => { setDraft(config); }, [config]);
+
+  const setTop = (k, v) => setDraft((d) => ({ ...d, top: { ...d.top, [k]: v } }));
+  const setWel = (k, v) => setDraft((d) => ({ ...d, welcome: { ...d.welcome, [k]: v } }));
+  const setBest = (k, v) => setDraft((d) => ({ ...d, best: { ...d.best, [k]: v } }));
+  const cards = draft.best.cards || [];
+  const setCards = (fn) => setDraft((d) => ({ ...d, best: { ...d.best, cards: fn(d.best.cards || []) } }));
+
+  const usedIds = new Set(cards.map((c) => c.catId));
+  const available = tier1.filter((c) => !usedIds.has(c.id));
+  const addCard = () => { const c = available[0]; if (!c) return; setCards((cs) => [...cs, { catId: c.id, name: "", color: CAT_ACCENT[c.name] || "#0C831F", emoji: "" }]); };
+  const updCard = (i, k, v) => setCards((cs) => cs.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
+  const delCard = (i) => setCards((cs) => cs.filter((_, j) => j !== i));
+  const moveCard = (i, dir) => setCards((cs) => { const j = i + dir; if (j < 0 || j >= cs.length) return cs; const n = [...cs]; [n[i], n[j]] = [n[j], n[i]]; return n; });
+
+  const nameOf = (id) => { const c = tier1.find((x) => x.id === id); return c ? c.name : "—"; };
+  const deptEmojis = (id) => {
+    const nm = nameOf(id);
+    const e = inv.filter((p) => p.cat === nm).slice(0, 4).map((p) => p.emoji || emojiFor(p.name));
+    while (e.length < 4) e.push("🛒");
+    return e;
+  };
+  const deptCount = (id) => inv.filter((p) => p.cat === nameOf(id)).length;
+  // بطاقات المعاينة: المضبوطة يدوياً، وإلا أول ٦ أقسام تلقائياً (مثل الصفحة الرئيسية)
+  const previewCards = cards.length ? cards : tier1.slice(0, 6).map((c) => ({ catId: c.id, name: "", color: CAT_ACCENT[c.name] || "#0C831F", emoji: "" }));
+
+  const save = async () => { setBusy(true); try { await onSave(draft); setSaved(true); setTimeout(() => setSaved(false), 2600); } catch (e) { console.error(e); alert("تعذّر الحفظ: " + (e.message || "")); } finally { setBusy(false); } };
+  const resetAll = () => { if (window.confirm("استرجاع الإعدادات الافتراضية للصفحة الرئيسية؟")) setDraft(DEFAULT_HOME_CONFIG); };
+
+  const w = draft.welcome;
+
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5 items-start">
+      {/* ===== المحرّر ===== */}
+      <div className="flex flex-col gap-5">
+        {/* الترويسة العلوية */}
+        <SettingCard icon={Clock} title="الترويسة العلوية" sub="السطر الأعلى فوق شريط البحث (وقت التوصيل / الحالة)">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <HField label="السطر الصغير"><input value={draft.top.label} onChange={(e) => setTop("label", e.target.value)} className="text-sm font-bold" style={hf} placeholder="التوصيل خلال" /></HField>
+            <HField label="النص الكبير"><input value={draft.top.value} onChange={(e) => setTop("value", e.target.value)} className="text-sm font-bold" style={hf} placeholder="16 دقيقة" /></HField>
+            <HField label="الشارة" hint="اتركها فارغة لإخفائها"><input value={draft.top.badge} onChange={(e) => setTop("badge", e.target.value)} className="text-sm font-bold" style={hf} placeholder="24/7" /></HField>
+          </div>
+        </SettingCard>
+
+        {/* بانر الترحيب */}
+        <SettingCard icon={Palette} title="بانر الترحيب" sub="يظهر أعلى تبويب «الكل»" right={<MiniToggle on={w.on} onClick={() => setWel("on", !w.on)} />}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" style={{ opacity: w.on ? 1 : 0.5, pointerEvents: w.on ? "auto" : "none" }}>
+            <HField label="العنوان"><input value={w.title} onChange={(e) => setWel("title", e.target.value)} className="text-sm font-bold" style={hf} placeholder="أهلاً وسهلاً" /></HField>
+            <HField label="السطر الفرعي"><input value={w.subtitle} onChange={(e) => setWel("subtitle", e.target.value)} className="text-sm font-bold" style={hf} placeholder="اطلب الآن واستمتع بتوصيل مجاني" /></HField>
+            <HField label="إيموجي وسط العنوان"><input value={w.emoji} onChange={(e) => setWel("emoji", e.target.value)} className="text-sm font-bold" style={{ ...hf, textAlign: "center" }} placeholder="🎈" /></HField>
+            <HField label="إيموجي الجانبين"><input value={w.side} onChange={(e) => setWel("side", e.target.value)} className="text-sm font-bold" style={{ ...hf, textAlign: "center" }} placeholder="🛍️" /></HField>
+            <ColorField label="لون التدرّج (بداية)" value={w.c1} onChange={(v) => setWel("c1", v)} />
+            <ColorField label="لون التدرّج (نهاية)" value={w.c2} onChange={(v) => setWel("c2", v)} />
+            <ColorField label="لون النص" value={w.text} onChange={(v) => setWel("text", v)} />
+          </div>
+        </SettingCard>
+
+        {/* بطاقات الأكثر مبيعاً */}
+        <SettingCard icon={Boxes} title="بطاقات الأكثر مبيعاً" sub="بطاقات الأقسام تحت بانر الترحيب" right={<MiniToggle on={draft.best.on} onClick={() => setBest("on", !draft.best.on)} />}>
+          <div style={{ opacity: draft.best.on ? 1 : 0.5, pointerEvents: draft.best.on ? "auto" : "none" }}>
+            <HField label="عنوان القسم"><input value={draft.best.title} onChange={(e) => setBest("title", e.target.value)} className="text-sm font-bold" style={{ ...hf, maxWidth: 320 }} placeholder="الأكثر مبيعاً" /></HField>
+            <div className="mt-4 flex flex-col gap-2.5">
+              {cards.length === 0 && <p className="text-sm rounded-xl px-4 py-3" style={{ background: "#F7F8FA", color: "#7A8493" }}>لا بطاقات مخصّصة — ستظهر أول ٦ أقسام تلقائياً. أضِف بطاقات للتحكّم بالاختيار والألوان والترتيب.</p>}
+              {cards.map((cd, i) => (
+                <div key={i} className="rounded-xl p-3 flex items-center gap-2 flex-wrap" style={{ background: "#F7F8FA", border: "1px solid #EFF1F4" }}>
+                  <span className="rounded-lg flex items-center justify-center shrink-0" style={{ width: 38, height: 38, background: (cd.color || "#0C831F") + "1F", fontSize: 20 }}>{cd.emoji || emojiFor(nameOf(cd.catId))}</span>
+                  <select value={cd.catId} onChange={(e) => updCard(i, "catId", e.target.value)} className="text-sm font-bold" style={{ ...hf, width: "auto", flex: "1 1 150px" }}>
+                    {tier1.filter((c) => c.id === cd.catId || !usedIds.has(c.id)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <input value={cd.name} onChange={(e) => updCard(i, "name", e.target.value)} className="text-sm font-bold" style={{ ...hf, width: "auto", flex: "1 1 120px" }} placeholder={nameOf(cd.catId)} />
+                  <input type="color" value={cd.color || "#0C831F"} onChange={(e) => updCard(i, "color", e.target.value)} title="لون البطاقة" style={{ width: 42, height: 40, border: "1px solid #E6E9EE", borderRadius: 9, padding: 3, background: "#fff", cursor: "pointer" }} />
+                  <input value={cd.emoji} onChange={(e) => updCard(i, "emoji", e.target.value)} className="text-sm font-bold" style={{ ...hf, width: 60, textAlign: "center" }} placeholder="🛒" />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => moveCard(i, -1)} disabled={i === 0} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#5A6473", opacity: i === 0 ? 0.35 : 1 }}><ChevronUp size={15} /></button>
+                    <button onClick={() => moveCard(i, 1)} disabled={i === cards.length - 1} className="stepmini rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#5A6473", opacity: i === cards.length - 1 ? 0.35 : 1 }}><ChevronDown size={15} /></button>
+                    <button onClick={() => delCard(i)} className="icon-btn rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, color: "#E11D2A", background: "#FDECEC" }}><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={addCard} disabled={available.length === 0} className="btn-ghost rounded-xl flex items-center justify-center gap-2 text-sm font-extrabold mt-1" style={{ padding: "11px", opacity: available.length === 0 ? 0.5 : 1 }}><Plus size={16} /> {available.length === 0 ? "كل الأقسام مُضافة" : "إضافة بطاقة قسم"}</button>
+            </div>
+          </div>
+        </SettingCard>
+
+        <div className="flex items-center gap-3">
+          <button onClick={save} disabled={busy} className="btn-green rounded-xl flex items-center justify-center gap-2 text-sm font-extrabold" style={{ padding: "13px 26px", opacity: busy ? 0.6 : 1 }}>
+            {busy ? <><Loader2 size={17} className="spin" /> جاري الحفظ…</> : saved ? <><CheckCircle2 size={17} /> تم الحفظ ✓</> : <><Check size={17} /> حفظ ونشر التغييرات</>}
+          </button>
+          <button onClick={resetAll} className="btn-ghost rounded-xl flex items-center gap-2 text-sm font-bold" style={{ padding: "13px 18px" }}><RotateCcw size={15} /> استرجاع الافتراضي</button>
+          {saved && <span className="text-sm font-bold" style={{ color: "#0C831F" }}>ستظهر التغييرات للزبون فوراً</span>}
+        </div>
+      </div>
+
+      {/* ===== معاينة حيّة ===== */}
+      <div className="panel rounded-2xl overflow-hidden xl:sticky" style={{ top: 92 }}>
+        <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #F1F2F4" }}>
+          <Eye size={16} style={{ color: "#0C831F" }} /><span className="text-sm font-extrabold">معاينة مباشرة</span>
+        </div>
+        <div dir="rtl" style={{ background: "#fff", maxHeight: "70vh", overflowY: "auto" }}>
+          {/* ترويسة */}
+          <div style={{ background: "radial-gradient(135% 100% at 50% -20%, #FCE08A 0%, #F4C53D 48%, #E7AB22 100%)", padding: "12px 16px" }}>
+            <p className="text-xs font-bold" style={{ color: "rgba(58,42,10,.84)" }}>{draft.top.label || "—"}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="font-black" style={{ color: "#3A2A0A", fontSize: 24 }}>{draft.top.value || "—"}</span>
+              {draft.top.badge ? <span className="text-xs font-bold rounded-full px-2 py-0.5" style={{ background: "rgba(58,42,10,.12)", color: "#3A2A0A" }}>{draft.top.badge}</span> : null}
+            </div>
+            <div className="mt-2 rounded-xl flex items-center gap-2 px-3" style={{ background: "#fff", height: 38 }}>
+              <Search size={16} style={{ color: "#9AA3AF" }} /><span className="text-xs font-bold" style={{ color: "#9AA3AF" }}>دور على «مشروبات غازية»</span>
+            </div>
+          </div>
+          {/* بانر الترحيب */}
+          {w.on && (
+            <div style={{ background: `linear-gradient(180deg, ${w.c1}, ${w.c2})`, color: w.text, borderEndStartRadius: 28, borderEndEndRadius: 28 }}>
+              <div className="flex items-center justify-center gap-2 px-4 py-4">
+                {w.side ? <span style={{ fontSize: 30 }}>{w.side}</span> : null}
+                <div className="text-center min-w-0">
+                  <p className="font-black leading-tight" style={{ color: w.text, fontSize: 17 }}>✦ {w.title} {w.emoji} ✦</p>
+                  <p className="text-xs font-semibold mt-0.5" style={{ color: w.text, opacity: 0.95 }}>{w.subtitle}</p>
+                </div>
+                {w.side ? <span style={{ fontSize: 30 }}>{w.side}</span> : null}
+              </div>
+            </div>
+          )}
+          {/* الأكثر مبيعاً */}
+          {draft.best.on && (
+            <div className="px-3 pt-4 pb-5">
+              <h4 className="text-sm font-extrabold mb-2 px-0.5">{draft.best.title || "الأكثر مبيعاً"}</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {previewCards.slice(0, 6).map((cd, i) => {
+                  const e = deptEmojis(cd.catId);
+                  return (
+                    <div key={i} className="rounded-xl p-1.5" style={{ background: (cd.color || "#9AA8B5") + "14", border: "1px solid " + (cd.color || "#ECEEF3") + "33" }}>
+                      <div className="grid grid-cols-2 gap-0.5">
+                        {[0, 1, 2, 3].map((k) => <div key={k} className="rounded flex items-center justify-center" style={{ aspectRatio: "1/1", background: "#fff", fontSize: 15 }}>{cd.emoji || e[k]}</div>)}
+                      </div>
+                      <span className="inline-block mt-1.5 text-[10px] font-bold rounded-full px-1.5 py-0.5" style={{ background: (cd.color || "#5A6473") + "22", color: cd.color || "#5A6473" }}>{deptCount(cd.catId)} منتج</span>
+                      <p className="text-[11px] font-extrabold mt-0.5 leading-tight">{cd.name || nameOf(cd.catId)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Loading() {
   return (
     <div className="flex flex-col items-center justify-center" style={{ minHeight: "60vh" }}>
@@ -935,16 +1133,18 @@ export default function AdminDashboard() {
   const [riders, setRiders] = useState([]);
   const [cats, setCats] = useState([]);
   const [selT1, setSelT1] = useState(null);
+  const [homeCfg, setHomeCfg] = useState(DEFAULT_HOME_CONFIG);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [p, o, c, r, cat] = await Promise.all([getProducts(), getOrders(), getCustomers(), getRiders(), getCategories()]);
+        const [p, o, c, r, cat, hc] = await Promise.all([getProducts(), getOrders(), getCustomers(), getRiders(), getCategories(), getHomeConfig()]);
         if (!alive) return;
         setInv(p); setOrders(o); setCustomers(c); setRiders(r);
         setCats(cat); setSelT1(cat.find((x) => x.parentId == null)?.id ?? null);
+        setHomeCfg(hc);
       } catch (e) {
         console.error("فشل تحميل البيانات من Supabase:", e);
       } finally {
@@ -953,6 +1153,14 @@ export default function AdminDashboard() {
     })();
     return () => { alive = false; };
   }, []);
+
+  // حفظ إعدادات الصفحة الرئيسية: تحديث متفائل + استدعاء API (يعمل في الوضعين)
+  const saveHome = async (cfg) => {
+    setHomeCfg(cfg);
+    const merged = await saveHomeConfig(cfg);
+    setHomeCfg(merged);
+    return merged;
+  };
 
   // ---- إدارة الأقسام: تحديث متفائل + استدعاء API بلا انتظار (مثل accept/onAdjust) ----
   const addCat = (name, iconName, parentId) => {
@@ -1110,6 +1318,7 @@ export default function AdminDashboard() {
               {active === "orders" && <OrdersView orders={orders} inv={inv} riders={riders} accept={accept} ready={ready} deliver={deliver} />}
               {active === "inv" && <InventoryView inv={inv} cats={cats} onAdjust={onAdjust} onAdd={addProduct} onEdit={editProduct} onDelete={removeProduct} onImport={importProducts} />}
               {active === "cats" && <CategoriesView cats={cats} inv={inv} selT1={selT1} setSelT1={setSelT1} onAdd={addCat} onEdit={editCat} onDelete={removeCat} onMove={moveCat} />}
+              {active === "home" && <HomeSettingsView config={homeCfg} cats={cats} inv={inv} onSave={saveHome} />}
               {active === "cust" && <CustomersView customers={customers} />}
               {active === "analytics" && <AnalyticsView />}
             </>

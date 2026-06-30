@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "./cart.jsx";
 import { useCatalog } from "./catalog.js";
+import { useHomeConfig } from "./homeConfig.js";
 import { emojiFor } from "./emoji.js";
 import {
   MapPin, ChevronDown, ChevronLeft, Wallet, User, Search, Mic, X, Clock,
@@ -347,6 +348,7 @@ export default function HomePage() {
   const nav = useNavigate();
   const { qty, add, inc, dec, subtotal, count } = useCart();
   const { loading, tier1, subsOf, byCat, cats } = useCatalog();
+  const cfg = useHomeConfig();
 
   const bottomRef = useRef(null);
   const [bottomH, setBottomH] = useState(150);
@@ -371,12 +373,19 @@ export default function HomePage() {
   const tabs = [{ id: "all", label: "الكل", Icon: ShoppingBag, theme: THEMES.gold }, ...catTabs];
   const activeTabObj = tabs.find((t) => t.id === activeTab) || tabs[0];
   const theme = activeTabObj.theme || THEMES.gold;
-  const bestsellers = tier1.slice(0, 6).map((cobj) => {
+  // بطاقات «الأكثر مبيعاً»: من إعدادات الأدمن إن وُجدت، وإلا اشتقاق تلقائي من الأقسام
+  const buildBestCard = (cobj, name, color, hero) => {
     const ps = byCat(cobj.id);
     const e = ps.slice(0, 4).map((p) => emojiFor(p.name));
-    while (e.length < 4) e.push("🛒");
-    return { id: cobj.id, name: cobj.name, count: ps.length, e };
-  });
+    while (e.length < 4) e.push(hero || "🛒");
+    return { id: cobj.id, name: name || cobj.name, count: ps.length, e, color: color || null };
+  };
+  const cfgBestCards = (cfg.best.cards || [])
+    .map((cd) => ({ cd, cobj: tier1.find((c) => c.id === cd.catId) }))
+    .filter((x) => x.cobj);
+  const bestsellers = cfgBestCards.length
+    ? cfgBestCards.map(({ cd, cobj }) => buildBestCard(cobj, cd.name, cd.color, cd.emoji))
+    : tier1.slice(0, 6).map((cobj) => buildBestCard(cobj));
   const sections = tier1.map((cobj) => {
     const subs = subsOf(cobj.id);
     return { id: cobj.id, title: cobj.name, items: subs.length ? subs : [cobj] };
@@ -393,10 +402,10 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 pt-3 pb-3 relative">
           <div className="flex items-start justify-between gap-3">
             <button onClick={() => setLocOpen((v) => !v)} className="min-w-0 text-start">
-              <p className="text-xs font-bold" style={{ color: theme.topSub }}>التوصيل خلال</p>
+              <p className="text-xs font-bold" style={{ color: theme.topSub }}>{cfg.top.label}</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <h1 className="font-black leading-none" style={{ color: theme.topText, fontSize: "30px" }}>16 دقيقة</h1>
-                <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2 py-0.5" style={{ background: theme.pill, color: theme.topText }}><Clock size={11} /> 24/7</span>
+                <h1 className="font-black leading-none" style={{ color: theme.topText, fontSize: "30px" }}>{cfg.top.value}</h1>
+                {cfg.top.badge ? <span className="inline-flex items-center gap-1 text-xs font-bold rounded-full px-2 py-0.5" style={{ background: theme.pill, color: theme.topText }}><Clock size={11} /> {cfg.top.badge}</span> : null}
               </div>
               <div className="flex items-center gap-1 mt-1.5" style={{ maxWidth: "62vw" }}>
                 <span className="text-sm truncate" style={{ color: theme.topText }}>
@@ -451,37 +460,40 @@ export default function HomePage() {
       {/* ===== BODY ===== */}
       {activeTab === "all" ? (
         <>
-          <div className="welcome" style={{ borderEndStartRadius: 36, borderEndEndRadius: 36 }}>
-            <div className="max-w-6xl mx-auto px-5 py-5 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="welcome-title text-2xl font-black leading-tight">✦ أهلاً وسهلاً ✦</p>
-                <p className="text-sm font-semibold mt-1.5 flex items-center gap-1.5" style={{ opacity: 0.95 }}>
-                  <Bike size={16} className="shrink-0" /> توصيل مجاني على أول طلب
-                </p>
+          {cfg.welcome.on && (
+            <div className="welcome" style={{ background: linGrad([cfg.welcome.c1, cfg.welcome.c2], 180), color: cfg.welcome.text, borderEndStartRadius: 36, borderEndEndRadius: 36 }}>
+              <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-center gap-3">
+                {cfg.welcome.side ? <span className="cat-emoji-1 shrink-0" style={{ fontSize: 40, filter: "drop-shadow(0 8px 12px rgba(0,0,0,.22))" }}>{cfg.welcome.side}</span> : null}
+                <div className="text-center min-w-0">
+                  <p className="text-2xl font-black leading-tight" style={{ color: cfg.welcome.text }}>✦ {cfg.welcome.title} {cfg.welcome.emoji} ✦</p>
+                  <p className="text-sm font-semibold mt-1" style={{ color: cfg.welcome.text, opacity: 0.95 }}>{cfg.welcome.subtitle}</p>
+                </div>
+                {cfg.welcome.side ? <span className="cat-emoji-2 shrink-0" style={{ fontSize: 40, filter: "drop-shadow(0 8px 12px rgba(0,0,0,.22))" }}>{cfg.welcome.side}</span> : null}
               </div>
-              <span className="cat-emoji-1 shrink-0" style={{ fontSize: 46, filter: "drop-shadow(0 8px 12px rgba(0,0,0,.25))" }}>🛵</span>
             </div>
-          </div>
+          )}
 
           {loading ? (
             <div className="max-w-6xl mx-auto px-4 py-16 text-center text-sm font-bold" style={{ color: "#9AA3AF" }}>جاري تحميل الكتالوج…</div>
           ) : (
             <>
-              {/* تسوّق حسب القسم — من أقسام لوحة الأدمن */}
+              {/* الأكثر مبيعاً — بطاقات الأقسام (يتحكّم بها الأدمن: العنوان والألوان والأقسام) */}
+              {cfg.best.on && bestsellers.length > 0 && (
               <section className="max-w-6xl mx-auto px-3 pt-5">
-                <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>تسوّق حسب القسم</h2>
+                <h2 className="text-lg font-extrabold mb-3 px-0.5" style={{ color: "#1A1A1A" }}>{cfg.best.title}</h2>
                 <div className="grid grid-cols-3 lg:grid-cols-6 gap-2.5">
                   {bestsellers.map((cd) => (
-                    <button key={cd.id} onClick={() => goCat(cd.id)} className="best-card rounded-2xl p-2">
+                    <button key={cd.id} onClick={() => goCat(cd.id)} className="best-card rounded-2xl p-2" style={cd.color ? { background: cd.color + "14", borderColor: cd.color + "33" } : undefined}>
                       <div className="grid grid-cols-2 gap-1">
                         {[0, 1, 2, 3].map((i) => (<div key={i} className="img-box aspect-square rounded-md flex items-center justify-center" style={{ fontSize: 24 }}>{cd.e[i]}</div>))}
                       </div>
-                      <span className="best-pill inline-block mt-2 text-xs font-bold rounded-full px-2 py-0.5">{cd.count} منتج</span>
+                      <span className="best-pill inline-block mt-2 text-xs font-bold rounded-full px-2 py-0.5" style={cd.color ? { background: cd.color + "22", color: cd.color } : undefined}>{cd.count} منتج</span>
                       <p className="text-xs font-extrabold mt-1 leading-tight" style={{ color: "#1A1A1A" }}>{cd.name}</p>
                     </button>
                   ))}
                 </div>
               </section>
+              )}
 
               {/* الأقسام وتفرّعاتها — من شجرة الكتالوج المشتركة */}
               {sections.map((sec) => (

@@ -224,6 +224,24 @@ create policy "order_items read"  on public.order_items for select using (true);
 create policy "order_items write" on public.order_items for all    using (true) with check (true);
 
 -- =====================================================================
+--  SETTINGS — إعدادات عامة (مفتاح/قيمة JSON) يتحكّم بها الأدمن.
+--  تُستخدم لإعدادات الصفحة الرئيسية (key='home_config'): الترويسة + بانر
+--  الترحيب + بطاقات «الأكثر مبيعاً» (النصوص والألوان والإيموجي).
+-- =====================================================================
+create table if not exists public.settings (
+  key         text primary key,
+  value       jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+comment on table public.settings is 'إعدادات عامة قابلة للتحرير من لوحة الأدمن (key/value JSON) — مثل إعدادات الصفحة الرئيسية';
+
+alter table public.settings enable row level security;
+drop policy if exists "settings read"  on public.settings;
+drop policy if exists "settings write" on public.settings;
+create policy "settings read"  on public.settings for select using (true);
+create policy "settings write" on public.settings for all    using (true) with check (true);
+
+-- =====================================================================
 --  تمّ ✅  الجداول + المفاتيح + الفهارس + الزمن الحقيقي (orders) + RLS.
 --  التالي: شغّل ملف الـ seed لتعبئة بيانات تجريبية، أو أدخِل من التطبيقات.
 -- =====================================================================

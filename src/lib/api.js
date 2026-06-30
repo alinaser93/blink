@@ -41,6 +41,51 @@ let MOCK_PRODUCTS_STORE = MOCK_PRODUCTS.map((p) => ({
   weight: p.weight || "", mrp: p.mrp || 0, emoji: null, rating: p.rating || null, reviews: p.reviews || null,
 }));
 
+/* ============================ إعدادات الصفحة الرئيسية (يتحكّم بها الأدمن) ============================ */
+//  تُخزَّن في جدول settings (key='home_config', value jsonb) عند الاتصال بـ Supabase،
+//  وإلا في الذاكرة ضمن الجلسة. أي حقل ناقص يُكمَّل من الافتراضي (دمج آمن).
+export const DEFAULT_HOME_CONFIG = {
+  top:     { label: "التوصيل خلال", value: "16 دقيقة", badge: "24/7" },
+  welcome: { on: true, title: "أهلاً وسهلاً", subtitle: "اطلب الآن واستمتع بتوصيل مجاني", emoji: "🎈", side: "🛍️", c1: "#6F4F29", c2: "#5A3E1E", text: "#FBEFCF" },
+  // cards فارغة = اشتقاق تلقائي من الأقسام الرئيسية. غير ذلك: [{ catId, name?, color, emoji? }]
+  best:    { on: true, title: "الأكثر مبيعاً", cards: [] },
+};
+
+const mergeHomeConfig = (raw) => {
+  const c = raw && typeof raw === "object" ? raw : {};
+  const best = c.best && typeof c.best === "object" ? c.best : {};
+  return {
+    top:     { ...DEFAULT_HOME_CONFIG.top, ...(c.top && typeof c.top === "object" ? c.top : {}) },
+    welcome: { ...DEFAULT_HOME_CONFIG.welcome, ...(c.welcome && typeof c.welcome === "object" ? c.welcome : {}) },
+    best:    { ...DEFAULT_HOME_CONFIG.best, ...best, cards: Array.isArray(best.cards) ? best.cards : [] },
+  };
+};
+
+let MOCK_HOME_CONFIG = mergeHomeConfig(null);
+
+export async function getHomeConfig() {
+  if (!isLive) return mergeHomeConfig(MOCK_HOME_CONFIG);
+  try {
+    const { data, error } = await supabase.from("settings").select("value").eq("key", "home_config").maybeSingle();
+    if (error) throw error;
+    return mergeHomeConfig(data ? data.value : null);
+  } catch (e) {
+    console.error("تعذّر جلب إعدادات الصفحة الرئيسية، سيُستخدم الافتراضي:", e);
+    return mergeHomeConfig(null);   // لا نكسر الواجهة لو غاب الجدول أو مُنع الوصول
+  }
+}
+
+export async function saveHomeConfig(cfg) {
+  const merged = mergeHomeConfig(cfg);
+  if (!isLive) { MOCK_HOME_CONFIG = merged; return merged; }
+  const { error } = await supabase.from("settings").upsert(
+    { key: "home_config", value: merged, updated_at: new Date().toISOString() },
+    { onConflict: "key" }
+  );
+  if (error) throw error;
+  return merged;
+}
+
 // يحوّل صفّ منتج تجريبي إلى الشكل الموحّد: cat=اسم القسم الرئيسي، sub=اسم التفرّع (إن وُجد)
 const resolveMockProduct = (p) => {
   const c = MOCK_CATEGORIES.find((x) => x.id === p.categoryId);
