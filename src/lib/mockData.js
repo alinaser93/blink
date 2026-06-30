@@ -2,154 +2,178 @@ import {
   Apple, Milk, CupSoda, Popcorn, Egg, Wheat, Droplet, GlassWater, Carrot, Coffee, Package,
 } from "lucide-react";
 
-// خريطة اسم الأيقونة -> مكوّن lucide (لتحويل قيمة 'icon' القادمة من قاعدة البيانات)
 export const ICON_MAP = { Apple, Milk, CupSoda, Popcorn, Egg, Wheat, Droplet, GlassWater, Carrot, Coffee, Package };
 
-/* =====================================================================
- *  الكتالوج الموحّد (مصدر الحقيقة الوحيد) — تُديره لوحة الأدمن، وتقرأه صفحات الزبون.
- *  شجرة من مستويين: قسم رئيسي (parentId=null) -> تفرّعات.
- *  المنتجات تُربط بـ categoryId (غالباً تفرّع tier2، وقد يكون قسماً رئيسياً).
- * ===================================================================== */
+// كتالوج تجريبي بتصنيف Blinkit: قسم (Department) -> فئة (Category) -> منتجات
 export const MOCK_CATEGORIES = [
-  // ---- أقسام رئيسية (tier1) ----
-  { id: "c1", name: "خضار وفواكه",            parentId: null, iconName: "Carrot",  sort: 0 },
-  { id: "c2", name: "ألبان وبيض وخبز",        parentId: null, iconName: "Milk",    sort: 1 },
-  { id: "c3", name: "مشروبات وعصائر",         parentId: null, iconName: "CupSoda", sort: 2 },
-  { id: "c4", name: "سناكس وحلويات",          parentId: null, iconName: "Popcorn", sort: 3 },
-  { id: "c5", name: "بقالة وأساسيات",         parentId: null, iconName: "Wheat",   sort: 4 },
-  { id: "c6", name: "وجبات سريعة ومعلّبات",   parentId: null, iconName: "Coffee",  sort: 5 },
-  { id: "c7", name: "العناية والجمال",        parentId: null, iconName: "Droplet", sort: 6 },
-  { id: "c8", name: "أساسيات المنزل",         parentId: null, iconName: "Package", sort: 7 },
-
-  // ---- تفرّعات c1: خضار وفواكه ----
-  { id: "c1a", name: "خضار طازجة",   parentId: "c1", iconName: null, sort: 0 },
-  { id: "c1b", name: "فواكه طازجة",  parentId: "c1", iconName: null, sort: 1 },
-  { id: "c1c", name: "فواكه مستوردة", parentId: "c1", iconName: null, sort: 2 },
-  { id: "c1d", name: "أعشاب وورقيات", parentId: "c1", iconName: null, sort: 3 },
-  { id: "c1e", name: "خضار مجمّدة",  parentId: "c1", iconName: null, sort: 4 },
-
-  // ---- تفرّعات c2: ألبان وبيض وخبز ----
-  { id: "c2a", name: "حليب",          parentId: "c2", iconName: null, sort: 0 },
-  { id: "c2b", name: "أجبان وألبان",  parentId: "c2", iconName: null, sort: 1 },
-  { id: "c2c", name: "بيض",           parentId: "c2", iconName: null, sort: 2 },
-  { id: "c2d", name: "خبز ومخبوزات",  parentId: "c2", iconName: null, sort: 3 },
-
-  // ---- تفرّعات c3: مشروبات وعصائر ----
-  { id: "c3a", name: "مشروبات غازية", parentId: "c3", iconName: null, sort: 0 },
-  { id: "c3b", name: "عصائر",         parentId: "c3", iconName: null, sort: 1 },
-  { id: "c3c", name: "ماء",           parentId: "c3", iconName: null, sort: 2 },
-  { id: "c3d", name: "شاي وقهوة",     parentId: "c3", iconName: null, sort: 3 },
-
-  // ---- تفرّعات c4: سناكس وحلويات ----
-  { id: "c4a", name: "شيبس وتسالي",     parentId: "c4", iconName: null, sort: 0 },
-  { id: "c4b", name: "شوكولاتة وحلويات", parentId: "c4", iconName: null, sort: 1 },
-  { id: "c4c", name: "بسكويت وكيك",     parentId: "c4", iconName: null, sort: 2 },
-  { id: "c4d", name: "آيس كريم",        parentId: "c4", iconName: null, sort: 3 },
-  { id: "c4e", name: "مكسرات وبزر",     parentId: "c4", iconName: null, sort: 4 },
-
-  // ---- تفرّعات c5: بقالة وأساسيات ----
-  { id: "c5a", name: "رز وحبوب",          parentId: "c5", iconName: null, sort: 0 },
-  { id: "c5b", name: "زيوت وسمن",         parentId: "c5", iconName: null, sort: 1 },
-  { id: "c5c", name: "سكر وملح وبهارات",  parentId: "c5", iconName: null, sort: 2 },
-  { id: "c5d", name: "معلّبات وصلصات",    parentId: "c5", iconName: null, sort: 3 },
-
-  // ---- تفرّعات c6: وجبات سريعة ومعلّبات ----
-  { id: "c6a", name: "مكرونة ووجبات سريعة", parentId: "c6", iconName: null, sort: 0 },
-  { id: "c6b", name: "شوربات جاهزة",        parentId: "c6", iconName: null, sort: 1 },
-  { id: "c6c", name: "أطعمة مجمّدة",        parentId: "c6", iconName: null, sort: 2 },
-
-  // ---- تفرّعات c7: العناية والجمال ----
-  { id: "c7a", name: "العناية بالبشرة", parentId: "c7", iconName: null, sort: 0 },
-  { id: "c7b", name: "العناية بالشعر",  parentId: "c7", iconName: null, sort: 1 },
-  { id: "c7c", name: "مكياج وعطور",     parentId: "c7", iconName: null, sort: 2 },
-
-  // ---- تفرّعات c8: أساسيات المنزل ----
-  { id: "c8a", name: "منظفات وتنظيف",        parentId: "c8", iconName: null, sort: 0 },
-  { id: "c8b", name: "أدوات المطبخ والمائدة", parentId: "c8", iconName: null, sort: 1 },
-  { id: "c8c", name: "إضاءة وبطاريات",       parentId: "c8", iconName: null, sort: 2 },
+  { id: "d1", name: "البقالة والمطبخ", parentId: null, iconName: "Package", sort: 0 },
+  { id: "d2", name: "السناكس والمشروبات", parentId: null, iconName: "Package", sort: 1 },
+  { id: "d3", name: "الجمال والعناية الشخصية", parentId: null, iconName: "Package", sort: 2 },
+  { id: "d4", name: "أساسيات المنزل", parentId: null, iconName: "Package", sort: 3 },
+  { id: "d5", name: "إلكترونيات ومستلزمات", parentId: null, iconName: "Package", sort: 4 },
+  { id: "d1c1", name: "خضار وفواكه", parentId: "d1", iconName: null, sort: 0 },
+  { id: "d1c2", name: "طحين ورز وبقوليات", parentId: "d1", iconName: null, sort: 1 },
+  { id: "d1c3", name: "زيوت وسمن وبهارات", parentId: "d1", iconName: null, sort: 2 },
+  { id: "d1c4", name: "ألبان وبيض وخبز", parentId: "d1", iconName: null, sort: 3 },
+  { id: "d1c5", name: "مخبوزات وبسكويت", parentId: "d1", iconName: null, sort: 4 },
+  { id: "d1c6", name: "مكسرات وحبوب الفطور", parentId: "d1", iconName: null, sort: 5 },
+  { id: "d1c7", name: "دجاج ولحوم وأسماك", parentId: "d1", iconName: null, sort: 6 },
+  { id: "d2c1", name: "شيبس وتسالي", parentId: "d2", iconName: null, sort: 0 },
+  { id: "d2c2", name: "حلويات وشوكولاتة", parentId: "d2", iconName: null, sort: 1 },
+  { id: "d2c3", name: "مشروبات وعصائر", parentId: "d2", iconName: null, sort: 2 },
+  { id: "d2c4", name: "شاي وقهوة وحليب", parentId: "d2", iconName: null, sort: 3 },
+  { id: "d2c5", name: "أطعمة فورية", parentId: "d2", iconName: null, sort: 4 },
+  { id: "d2c6", name: "صلصات ومربّيات", parentId: "d2", iconName: null, sort: 5 },
+  { id: "d2c7", name: "آيس كريم والمزيد", parentId: "d2", iconName: null, sort: 6 },
+  { id: "d3c1", name: "الحمام والجسم", parentId: "d3", iconName: null, sort: 0 },
+  { id: "d3c2", name: "العناية بالشعر", parentId: "d3", iconName: null, sort: 1 },
+  { id: "d3c3", name: "البشرة والوجه", parentId: "d3", iconName: null, sort: 2 },
+  { id: "d3c4", name: "التجميل والمكياج", parentId: "d3", iconName: null, sort: 3 },
+  { id: "d3c5", name: "العناية النسائية", parentId: "d3", iconName: null, sort: 4 },
+  { id: "d3c6", name: "العناية بالطفل", parentId: "d3", iconName: null, sort: 5 },
+  { id: "d3c7", name: "الصحة والدواء", parentId: "d3", iconName: null, sort: 6 },
+  { id: "d4c1", name: "تنظيف المنزل", parentId: "d4", iconName: null, sort: 0 },
+  { id: "d4c2", name: "منظفات الغسيل", parentId: "d4", iconName: null, sort: 1 },
+  { id: "d4c3", name: "أدوات المطبخ والمائدة", parentId: "d4", iconName: null, sort: 2 },
+  { id: "d4c4", name: "نفايات وأكياس", parentId: "d4", iconName: null, sort: 3 },
+  { id: "d4c5", name: "العناية بالحيوانات", parentId: "d4", iconName: null, sort: 4 },
+  { id: "d4c6", name: "بطاريات وإضاءة", parentId: "d4", iconName: null, sort: 5 },
+  { id: "d5c1", name: "سماعات وصوتيات", parentId: "d5", iconName: null, sort: 0 },
+  { id: "d5c2", name: "شواحن وكوابل", parentId: "d5", iconName: null, sort: 1 },
+  { id: "d5c3", name: "إكسسوارات الجوال", parentId: "d5", iconName: null, sort: 2 },
+  { id: "d5c4", name: "ألعاب أطفال", parentId: "d5", iconName: null, sort: 3 },
+  { id: "d5c5", name: "قرطاسية ومكتب", parentId: "d5", iconName: null, sort: 4 },
 ];
 
-/* المنتجات: categoryId يشير لتفرّع (tier2) غالباً. rating/reviews عرضية (لا تُخزّن في القاعدة). */
 export const MOCK_PRODUCTS = [
-  // خضار طازجة (c1a)
-  { id: "p1",  name: "طماطم طازجة",         categoryId: "c1a", weight: "500 غرام", price: 1250, mrp: 1600, stock: 64, rating: "4.4", reviews: "12 ألف" },
-  { id: "p2",  name: "خيار إنجليزي",        categoryId: "c1a", weight: "500 غرام", price: 1800, mrp: 2100, stock: 40, rating: "4.3", reviews: "9 ألف" },
-  { id: "p3",  name: "بصل أحمر",            categoryId: "c1a", weight: "1 كغم",    price: 1900, mrp: 2250, stock: 55, rating: "4.5", reviews: "30 ألف" },
-  { id: "p4",  name: "بطاطا",               categoryId: "c1a", weight: "1 كغم",    price: 1250, mrp: 1500, stock: 70, rating: "4.4", reviews: "18 ألف" },
-  { id: "p5",  name: "جزر برتقالي",          categoryId: "c1a", weight: "500 غرام", price: 1000, mrp: 1200, stock: 48, rating: "4.2", reviews: "6 ألف" },
-  // فواكه طازجة (c1b)
-  { id: "p6",  name: "موز عضوي",            categoryId: "c1b", weight: "1 كغم",    price: 2000, mrp: 2400, stock: 48, rating: "4.6", reviews: "40 ألف" },
-  { id: "p7",  name: "تفاح أحمر",           categoryId: "c1b", weight: "1 كغم",    price: 3500, mrp: 4200, stock: 36, rating: "4.5", reviews: "15 ألف" },
-  { id: "p8",  name: "برتقال أبو صرة",       categoryId: "c1b", weight: "1 كغم",    price: 2750, mrp: 3200, stock: 42, rating: "4.4", reviews: "8 ألف" },
-  // فواكه مستوردة (c1c)
-  { id: "p9",  name: "مانجو صفدا فاخر",      categoryId: "c1c", weight: "600 غرام", price: 6000, mrp: 7400, stock: 20, rating: "4.5", reviews: "3 ألف" },
-  { id: "p10", name: "كرز أحمر مستورد",      categoryId: "c1c", weight: "200 غرام", price: 7450, mrp: 9350, stock: 12, rating: "4.5", reviews: "900" },
-  // خضار مجمّدة (c1e)
-  { id: "p11", name: "بازلاء خضراء مجمّدة",  categoryId: "c1e", weight: "500 غرام", price: 5750, mrp: 6750, stock: 30, rating: "4.5", reviews: "63 ألف" },
-  { id: "p12", name: "خضار مشكّلة مجمّدة",   categoryId: "c1e", weight: "500 غرام", price: 3650, mrp: 4250, stock: 26, rating: "4.3", reviews: "9 ألف" },
-
-  // حليب (c2a)
-  { id: "p13", name: "حليب طازج كامل الدسم", categoryId: "c2a", weight: "1 لتر",   price: 1500, mrp: 1750, stock: 6,  rating: "4.5", reviews: "22 ألف" },
-  { id: "p14", name: "حليب قليل الدسم",      categoryId: "c2a", weight: "1 لتر",   price: 1500, mrp: 0,    stock: 18, rating: "4.4", reviews: "11 ألف" },
-  // أجبان وألبان (c2b)
-  { id: "p15", name: "جبنة شيدر مبشورة",     categoryId: "c2b", weight: "200 غرام", price: 6000, mrp: 7000, stock: 9,  rating: "4.5", reviews: "7 ألف" },
-  { id: "p16", name: "لبن زبادي طبيعي",      categoryId: "c2b", weight: "1 كغم",   price: 2500, mrp: 0,    stock: 22, rating: "4.6", reviews: "14 ألف" },
-  // بيض (c2c)
-  { id: "p17", name: "بيض طازج (٣٠ حبة)",    categoryId: "c2c", weight: "30 حبة",  price: 4500, mrp: 5000, stock: 3,  rating: "4.5", reviews: "20 ألف" },
-  // خبز ومخبوزات (c2d)
-  { id: "p18", name: "خبز صمون طازج",        categoryId: "c2d", weight: "6 حبات",  price: 1000, mrp: 0,    stock: 50, rating: "4.4", reviews: "9 ألف" },
-
-  // مشروبات غازية (c3a)
-  { id: "p19", name: "بيبسي ٣٣٠ مل",         categoryId: "c3a", weight: "330 مل",  price: 750,  mrp: 1000, stock: 0,  rating: "4.4", reviews: "28 ألف" },
-  { id: "p20", name: "كوكا كولا",            categoryId: "c3a", weight: "330 مل",  price: 1900, mrp: 2000, stock: 80, rating: "4.5", reviews: "21 ألف" },
-  { id: "p21", name: "سبرايت بنكهة الليمون", categoryId: "c3a", weight: "330 مل",  price: 1900, mrp: 2000, stock: 60, rating: "4.3", reviews: "17 ألف" },
-  // عصائر (c3b)
-  { id: "p22", name: "عصير برتقال طازج",     categoryId: "c3b", weight: "1 لتر",   price: 2000, mrp: 2500, stock: 18, rating: "4.4", reviews: "5 ألف" },
-  { id: "p23", name: "عصير مانجو",           categoryId: "c3b", weight: "1 لتر",   price: 2250, mrp: 0,    stock: 24, rating: "4.5", reviews: "4 ألف" },
-  // ماء (c3c)
-  { id: "p24", name: "ماء معدني ١.٥ لتر",    categoryId: "c3c", weight: "1.5 لتر", price: 500,  mrp: 0,    stock: 0,  rating: "4.6", reviews: "33 ألف" },
-  // شاي وقهوة (c3d)
-  { id: "p25", name: "شاي أسود فاخر",        categoryId: "c3d", weight: "450 غرام", price: 4000, mrp: 5000, stock: 30, rating: "4.5", reviews: "12 ألف" },
-  { id: "p26", name: "قهوة عربية مطحونة",    categoryId: "c3d", weight: "250 غرام", price: 5500, mrp: 6500, stock: 16, rating: "4.6", reviews: "8 ألف" },
-
-  // شيبس وتسالي (c4a)
-  { id: "p27", name: "شيبس بنكهة الملح",     categoryId: "c4a", weight: "150 غرام", price: 1000, mrp: 0,    stock: 120, rating: "4.3", reviews: "38 ألف" },
-  { id: "p28", name: "بوشار بالجبن",         categoryId: "c4a", weight: "90 غرام",  price: 1250, mrp: 1500, stock: 60,  rating: "4.2", reviews: "9 ألف" },
-  // شوكولاتة وحلويات (c4b)
-  { id: "p29", name: "كيت كات أصابع شوكولاتة", categoryId: "c4b", weight: "38.5 غرام", price: 1500, mrp: 0, stock: 90, rating: "4.3", reviews: "390 ألف" },
-  { id: "p30", name: "لوح شوكولاتة داكنة",   categoryId: "c4b", weight: "35 غرام",  price: 1750, mrp: 2000, stock: 70, rating: "4.6", reviews: "85 ألف" },
-  // بسكويت وكيك (c4c)
-  { id: "p31", name: "بسكويت كوكيز شوكولاتة", categoryId: "c4c", weight: "241 غرام", price: 4000, mrp: 8000, stock: 40, rating: "4.5", reviews: "30 ألف" },
-  // آيس كريم (c4d)
-  { id: "p32", name: "آيس كريم فانيلا عائلي", categoryId: "c4d", weight: "1 لتر",   price: 6500, mrp: 0,    stock: 25, rating: "4.5", reviews: "110 ألف" },
-  // مكسرات وبزر (c4e)
-  { id: "p33", name: "تمر مجدول فاخر",       categoryId: "c4e", weight: "500 غرام", price: 8000, mrp: 9500, stock: 30, rating: "4.6", reviews: "6 ألف" },
-
-  // رز وحبوب (c5a)
-  { id: "p34", name: "رز بسمتي ٥ كغم",       categoryId: "c5a", weight: "5 كغم",   price: 12000, mrp: 14000, stock: 25, rating: "4.5", reviews: "44 ألف" },
-  // زيوت وسمن (c5b)
-  { id: "p35", name: "زيت دوّار الشمس ١ لتر", categoryId: "c5b", weight: "1 لتر",   price: 3500, mrp: 4200, stock: 40, rating: "4.4", reviews: "17 ألف" },
-  // سكر وملح وبهارات (c5c)
-  { id: "p36", name: "سكر أبيض ناعم",        categoryId: "c5c", weight: "1 كغم",   price: 2750, mrp: 3750, stock: 50, rating: "4.4", reviews: "270 ألف" },
-  { id: "p37", name: "ملح طعام نقي",         categoryId: "c5c", weight: "1 كغم",   price: 1500, mrp: 1650, stock: 64, rating: "4.5", reviews: "350 ألف" },
-  // معلّبات وصلصات (c5d)
-  { id: "p38", name: "معجون طماطم",          categoryId: "c5d", weight: "400 غرام", price: 1750, mrp: 0,    stock: 45, rating: "4.3", reviews: "8 ألف" },
-
-  // مكرونة ووجبات سريعة (c6a)
-  { id: "p39", name: "مكرونة ماجي سريعة",    categoryId: "c6a", weight: "300 غرام", price: 2900, mrp: 0,    stock: 70, rating: "4.6", reviews: "380 ألف" },
-  { id: "p40", name: "نودلز واي واي",        categoryId: "c6a", weight: "420 غرام", price: 2000, mrp: 2400, stock: 46, rating: "4.4", reviews: "46 ألف" },
-  // أطعمة مجمّدة (c6c)
-  { id: "p41", name: "بطاطا مقلية مجمّدة",    categoryId: "c6c", weight: "1 كغم",   price: 4500, mrp: 5500, stock: 28, rating: "4.4", reviews: "11 ألف" },
-
-  // العناية بالبشرة (c7a)
-  { id: "p42", name: "كريم ترطيب للوجه",     categoryId: "c7a", weight: "50 مل",   price: 8000, mrp: 12000, stock: 20, rating: "4.5", reviews: "20 ألف" },
-  // العناية بالشعر (c7b)
-  { id: "p43", name: "شامبو للشعر التالف",   categoryId: "c7b", weight: "400 مل",  price: 7000, mrp: 0,     stock: 26, rating: "4.3", reviews: "18 ألف" },
-
-  // منظفات وتنظيف (c8a)
-  { id: "p44", name: "سائل غسيل الأطباق",    categoryId: "c8a", weight: "1 لتر",   price: 3000, mrp: 3800, stock: 35, rating: "4.4", reviews: "9 ألف" },
-  // إضاءة وبطاريات (c8c)
-  { id: "p45", name: "لمبة LED ذكية",        categoryId: "c8c", weight: "1 قطعة",  price: 7000, mrp: 9000, stock: 18, rating: "4.1", reviews: "4 ألف" },
+  { id: "p1", name: "طماطم محلية", categoryId: "d1c1", weight: "كيلو", price: 1000, mrp: 1250, stock: 120, rating: "4.2", reviews: "1 ألف" },
+  { id: "p2", name: "خيار محلي", categoryId: "d1c1", weight: "كيلو", price: 1250, mrp: 0, stock: 90, rating: "4.3", reviews: "3 ألف" },
+  { id: "p3", name: "تفاح أحمر مستورد", categoryId: "d1c1", weight: "كيلو", price: 3000, mrp: 3500, stock: 75, rating: "4.4", reviews: "8 ألف" },
+  { id: "p4", name: "موز", categoryId: "d1c1", weight: "كيلو", price: 2000, mrp: 0, stock: 100, rating: "4.5", reviews: "12 ألف" },
+  { id: "p5", name: "رز عنبر عراقي", categoryId: "d1c2", weight: "كيس 5 كيلو", price: 12000, mrp: 14000, stock: 60, rating: "4.6", reviews: "40 ألف" },
+  { id: "p6", name: "رز بسمتي أبو كاس", categoryId: "d1c2", weight: "كيس 5 كيلو", price: 10000, mrp: 0, stock: 80, rating: "4.7", reviews: "90 ألف" },
+  { id: "p7", name: "طحين الحنطة الفاخر", categoryId: "d1c2", weight: "كيس 5 كيلو", price: 4500, mrp: 5500, stock: 70, rating: "4.2", reviews: "1 ألف" },
+  { id: "p8", name: "عدس أحمر", categoryId: "d1c2", weight: "كيلو", price: 2500, mrp: 0, stock: 85, rating: "4.3", reviews: "3 ألف" },
+  { id: "p9", name: "زيت زير عباد الشمس", categoryId: "d1c3", weight: "1.5 لتر", price: 4000, mrp: 4750, stock: 110, rating: "4.4", reviews: "8 ألف" },
+  { id: "p10", name: "سمن نباتي السنبلة", categoryId: "d1c3", weight: "علبة كيلو", price: 5000, mrp: 0, stock: 65, rating: "4.5", reviews: "12 ألف" },
+  { id: "p11", name: "معجون طماطم درّة", categoryId: "d1c3", weight: "علبة 800غ", price: 2250, mrp: 2750, stock: 95, rating: "4.6", reviews: "40 ألف" },
+  { id: "p12", name: "هيل حب", categoryId: "d1c3", weight: "كيس 100غ", price: 6000, mrp: 0, stock: 40, rating: "4.7", reviews: "90 ألف" },
+  { id: "p13", name: "حليب نادك كامل الدسم", categoryId: "d1c4", weight: "لتر", price: 1750, mrp: 2000, stock: 130, rating: "4.2", reviews: "1 ألف" },
+  { id: "p14", name: "جبن كيري مثلثات", categoryId: "d1c4", weight: "علبة 8 قطع", price: 2500, mrp: 0, stock: 100, rating: "4.3", reviews: "3 ألف" },
+  { id: "p15", name: "بيض المائدة", categoryId: "d1c4", weight: "طبق 30 بيضة", price: 5500, mrp: 6500, stock: 70, rating: "4.4", reviews: "8 ألف" },
+  { id: "p16", name: "لبن زبادي عبد الله", categoryId: "d1c4", weight: "علبة كيلو", price: 2000, mrp: 0, stock: 90, rating: "4.5", reviews: "12 ألف" },
+  { id: "p17", name: "صمون مخبز طازج", categoryId: "d1c5", weight: "كيس 6 حبات", price: 1000, mrp: 0, stock: 150, rating: "4.6", reviews: "40 ألف" },
+  { id: "p18", name: "بسكويت أولكر بالشوكولاتة", categoryId: "d1c5", weight: "باكيت", price: 1000, mrp: 1250, stock: 120, rating: "4.7", reviews: "90 ألف" },
+  { id: "p19", name: "كيك تيفاني", categoryId: "d1c5", weight: "علبة 12 حبة", price: 3000, mrp: 0, stock: 80, rating: "4.2", reviews: "1 ألف" },
+  { id: "p20", name: "ويفر لوكر", categoryId: "d1c5", weight: "باكيت", price: 1500, mrp: 1750, stock: 95, rating: "4.3", reviews: "3 ألف" },
+  { id: "p21", name: "فستق حلبي مملح", categoryId: "d1c6", weight: "كيس 250غ", price: 7000, mrp: 8000, stock: 55, rating: "4.4", reviews: "8 ألف" },
+  { id: "p22", name: "كورن فليكس كيلوغز", categoryId: "d1c6", weight: "علبة 500غ", price: 4500, mrp: 0, stock: 70, rating: "4.5", reviews: "12 ألف" },
+  { id: "p23", name: "لوز مقشّر", categoryId: "d1c6", weight: "كيس 250غ", price: 6500, mrp: 7500, stock: 50, rating: "4.6", reviews: "40 ألف" },
+  { id: "p24", name: "عسل طبيعي عراقي", categoryId: "d1c6", weight: "علبة 500غ", price: 12000, mrp: 0, stock: 40, rating: "4.7", reviews: "90 ألف" },
+  { id: "p25", name: "دجاج سدية مجمّد", categoryId: "d1c7", weight: "كيلو", price: 4000, mrp: 4750, stock: 100, rating: "4.2", reviews: "1 ألف" },
+  { id: "p26", name: "لحم غنم طازج", categoryId: "d1c7", weight: "كيلو", price: 17000, mrp: 0, stock: 45, rating: "4.3", reviews: "3 ألف" },
+  { id: "p27", name: "سمك كارب نهري", categoryId: "d1c7", weight: "كيلو", price: 7000, mrp: 8000, stock: 35, rating: "4.4", reviews: "8 ألف" },
+  { id: "p28", name: "لحم بقر مفروم", categoryId: "d1c7", weight: "كيلو", price: 14000, mrp: 0, stock: 50, rating: "4.5", reviews: "12 ألف" },
+  { id: "p29", name: "شيبس مستر بطعم الكاتشب", categoryId: "d2c1", weight: "كيس 50غ", price: 500, mrp: 0, stock: 120, rating: "4.6", reviews: "40 ألف" },
+  { id: "p30", name: "ليز بنكهة الملح", categoryId: "d2c1", weight: "كيس 80غ", price: 1000, mrp: 1250, stock: 90, rating: "4.7", reviews: "90 ألف" },
+  { id: "p31", name: "تشيتوس حار", categoryId: "d2c1", weight: "كيس 70غ", price: 1000, mrp: 0, stock: 85, rating: "4.2", reviews: "1 ألف" },
+  { id: "p32", name: "دوريتوس ناتشو", categoryId: "d2c1", weight: "كيس 90غ", price: 1500, mrp: 0, stock: 60, rating: "4.3", reviews: "3 ألف" },
+  { id: "p33", name: "جلاكسي حليب", categoryId: "d2c2", weight: "لوح 40غ", price: 1000, mrp: 0, stock: 110, rating: "4.4", reviews: "8 ألف" },
+  { id: "p34", name: "كت كات أربع أصابع", categoryId: "d2c2", weight: "قطعة 41غ", price: 1000, mrp: 1250, stock: 100, rating: "4.5", reviews: "12 ألف" },
+  { id: "p35", name: "نوتيلا", categoryId: "d2c2", weight: "مرطبان 350غ", price: 6500, mrp: 7500, stock: 45, rating: "4.6", reviews: "40 ألف" },
+  { id: "p36", name: "كندر بوينو", categoryId: "d2c2", weight: "قطعة 43غ", price: 1500, mrp: 0, stock: 80, rating: "4.7", reviews: "90 ألف" },
+  { id: "p37", name: "بيبسي علبة", categoryId: "d2c3", weight: "علبة 330مل", price: 750, mrp: 0, stock: 200, rating: "4.2", reviews: "1 ألف" },
+  { id: "p38", name: "سفن أب قنينة", categoryId: "d2c3", weight: "قنينة 1لتر", price: 1000, mrp: 1250, stock: 150, rating: "4.3", reviews: "3 ألف" },
+  { id: "p39", name: "صن توب برتقال", categoryId: "d2c3", weight: "باكيت 250مل", price: 500, mrp: 0, stock: 130, rating: "4.4", reviews: "8 ألف" },
+  { id: "p40", name: "رني مشمش", categoryId: "d2c3", weight: "علبة 240مل", price: 750, mrp: 0, stock: 95, rating: "4.5", reviews: "12 ألف" },
+  { id: "p41", name: "شاي الغزالين", categoryId: "d2c4", weight: "علبة 450غ", price: 4500, mrp: 5000, stock: 70, rating: "4.6", reviews: "40 ألف" },
+  { id: "p42", name: "نسكافيه كلاسيك", categoryId: "d2c4", weight: "علبة 100غ", price: 4000, mrp: 0, stock: 65, rating: "4.7", reviews: "90 ألف" },
+  { id: "p43", name: "حليب نادك مبستر", categoryId: "d2c4", weight: "قنينة 1لتر", price: 1750, mrp: 0, stock: 80, rating: "4.2", reviews: "1 ألف" },
+  { id: "p44", name: "قهوة عربية محمّصة", categoryId: "d2c4", weight: "كيس 250غ", price: 3500, mrp: 4000, stock: 50, rating: "4.3", reviews: "3 ألف" },
+  { id: "p45", name: "اندومي بنكهة الدجاج", categoryId: "d2c5", weight: "كيس 70غ", price: 500, mrp: 0, stock: 300, rating: "4.4", reviews: "8 ألف" },
+  { id: "p46", name: "شعيرية ماجي سريعة التحضير", categoryId: "d2c5", weight: "كيس 75غ", price: 750, mrp: 0, stock: 140, rating: "4.5", reviews: "12 ألف" },
+  { id: "p47", name: "شوربة ماجي خضار", categoryId: "d2c5", weight: "ظرف 60غ", price: 750, mrp: 1000, stock: 90, rating: "4.6", reviews: "40 ألف" },
+  { id: "p48", name: "تونة ربيع بالزيت", categoryId: "d2c5", weight: "علبة 185غ", price: 2000, mrp: 0, stock: 110, rating: "4.7", reviews: "90 ألف" },
+  { id: "p49", name: "كاتشب هاينز", categoryId: "d2c6", weight: "قنينة 340غ", price: 2500, mrp: 3000, stock: 75, rating: "4.2", reviews: "1 ألف" },
+  { id: "p50", name: "مايونيز هيلمنز", categoryId: "d2c6", weight: "مرطبان 400غ", price: 3000, mrp: 0, stock: 60, rating: "4.3", reviews: "3 ألف" },
+  { id: "p51", name: "مربى المشمش فيتراك", categoryId: "d2c6", weight: "مرطبان 450غ", price: 2500, mrp: 0, stock: 55, rating: "4.4", reviews: "8 ألف" },
+  { id: "p52", name: "معجون طماطم القطّاف", categoryId: "d2c6", weight: "علبة 380غ", price: 1250, mrp: 1500, stock: 120, rating: "4.5", reviews: "12 ألف" },
+  { id: "p53", name: "آيس كريم كورنيتو فانيلا", categoryId: "d2c7", weight: "قطعة 110مل", price: 1500, mrp: 0, stock: 85, rating: "4.6", reviews: "40 ألف" },
+  { id: "p54", name: "آيس كريم ماغنوم كلاسيك", categoryId: "d2c7", weight: "قطعة 100مل", price: 2500, mrp: 3000, stock: 50, rating: "4.7", reviews: "90 ألف" },
+  { id: "p55", name: "بوظة عائلية فستق", categoryId: "d2c7", weight: "علبة 1لتر", price: 4000, mrp: 0, stock: 40, rating: "4.2", reviews: "1 ألف" },
+  { id: "p56", name: "آيس كريم سندويش بسكويت", categoryId: "d2c7", weight: "قطعة 120مل", price: 1000, mrp: 0, stock: 70, rating: "4.3", reviews: "3 ألف" },
+  { id: "p57", name: "صابون لوكس وردي 170غ", categoryId: "d3c1", weight: "قطعة", price: 1000, mrp: 0, stock: 120, rating: "4.4", reviews: "8 ألف" },
+  { id: "p58", name: "شاور جل ديف منعش 250مل", categoryId: "d3c1", weight: "عبوة", price: 4500, mrp: 5500, stock: 80, rating: "4.5", reviews: "12 ألف" },
+  { id: "p59", name: "صابون ديتول واقي 165غ", categoryId: "d3c1", weight: "قطعة", price: 1250, mrp: 0, stock: 150, rating: "4.6", reviews: "40 ألف" },
+  { id: "p60", name: "ليفة استحمام ناعمة", categoryId: "d3c1", weight: "قطعة", price: 1500, mrp: 2000, stock: 60, rating: "4.7", reviews: "90 ألف" },
+  { id: "p61", name: "شامبو هيد اند شولدرز مضاد للقشرة 400مل", categoryId: "d3c2", weight: "عبوة", price: 6500, mrp: 8000, stock: 90, rating: "4.2", reviews: "1 ألف" },
+  { id: "p62", name: "شامبو بانتين تطويل 600مل", categoryId: "d3c2", weight: "عبوة", price: 7000, mrp: 0, stock: 70, rating: "4.3", reviews: "3 ألف" },
+  { id: "p63", name: "صبغة شعر جارنييه بني غامق", categoryId: "d3c2", weight: "علبة", price: 5000, mrp: 6000, stock: 50, rating: "4.4", reviews: "8 ألف" },
+  { id: "p64", name: "بلسم صنصيلك ناعم 350مل", categoryId: "d3c2", weight: "عبوة", price: 4000, mrp: 0, stock: 65, rating: "4.5", reviews: "12 ألف" },
+  { id: "p65", name: "كريم نيفيا مرطب علبة زرقاء 100مل", categoryId: "d3c3", weight: "علبة", price: 4000, mrp: 5000, stock: 100, rating: "4.6", reviews: "40 ألف" },
+  { id: "p66", name: "غسول وجه غارنييه فيتامين سي 100مل", categoryId: "d3c3", weight: "عبوة", price: 5500, mrp: 7000, stock: 75, rating: "4.7", reviews: "90 ألف" },
+  { id: "p67", name: "كريم واقي شمس نيفيا SPF50", categoryId: "d3c3", weight: "عبوة", price: 9000, mrp: 0, stock: 40, rating: "4.2", reviews: "1 ألف" },
+  { id: "p68", name: "مرطب شفاه فازلين أصلي", categoryId: "d3c3", weight: "قطعة", price: 2000, mrp: 2500, stock: 110, rating: "4.3", reviews: "3 ألف" },
+  { id: "p69", name: "أحمر شفاه ميبيلين مات أحمر", categoryId: "d3c4", weight: "قطعة", price: 7000, mrp: 9000, stock: 55, rating: "4.4", reviews: "8 ألف" },
+  { id: "p70", name: "ماسكارا ميبيلين كولوسال أسود", categoryId: "d3c4", weight: "قطعة", price: 8000, mrp: 0, stock: 50, rating: "4.5", reviews: "12 ألف" },
+  { id: "p71", name: "كريم أساس لوريال ترو ماتش", categoryId: "d3c4", weight: "عبوة", price: 14000, mrp: 17000, stock: 35, rating: "4.6", reviews: "40 ألف" },
+  { id: "p72", name: "محدد عيون كحل أسود سائل", categoryId: "d3c4", weight: "قطعة", price: 4500, mrp: 0, stock: 70, rating: "4.7", reviews: "90 ألف" },
+  { id: "p73", name: "فوط أولويز نهاري بأجنحة 10حبة", categoryId: "d3c5", weight: "عبوة", price: 2500, mrp: 3000, stock: 130, rating: "4.2", reviews: "1 ألف" },
+  { id: "p74", name: "فوط كوتكس ليلي طويل 8حبة", categoryId: "d3c5", weight: "عبوة", price: 2750, mrp: 0, stock: 95, rating: "4.3", reviews: "3 ألف" },
+  { id: "p75", name: "غسول نسائي ديتول لطيف 250مل", categoryId: "d3c5", weight: "عبوة", price: 5000, mrp: 6500, stock: 45, rating: "4.4", reviews: "8 ألف" },
+  { id: "p76", name: "مزيل عرق نيفيا للنساء رول 50مل", categoryId: "d3c5", weight: "عبوة", price: 3500, mrp: 0, stock: 85, rating: "4.5", reviews: "12 ألف" },
+  { id: "p77", name: "حفّاظات مولفيكس مقاس 4 مجموعة كبيرة", categoryId: "d3c6", weight: "عبوة", price: 11000, mrp: 13000, stock: 60, rating: "4.6", reviews: "40 ألف" },
+  { id: "p78", name: "مناديل أطفال جونسون مبللة 64حبة", categoryId: "d3c6", weight: "عبوة", price: 3000, mrp: 3750, stock: 120, rating: "4.7", reviews: "90 ألف" },
+  { id: "p79", name: "شامبو أطفال جونسون 200مل", categoryId: "d3c6", weight: "عبوة", price: 4500, mrp: 0, stock: 70, rating: "4.2", reviews: "1 ألف" },
+  { id: "p80", name: "كريم تسلخات سودوكريم 60غ", categoryId: "d3c6", weight: "علبة", price: 6000, mrp: 7500, stock: 40, rating: "4.3", reviews: "3 ألف" },
+  { id: "p81", name: "بنادول أزرق 24 حبة", categoryId: "d3c7", weight: "شريط", price: 2000, mrp: 0, stock: 150, rating: "4.4", reviews: "8 ألف" },
+  { id: "p82", name: "فيتامين سي 1000ملغ 20 حبة فوارة", categoryId: "d3c7", weight: "علبة", price: 4000, mrp: 5000, stock: 90, rating: "4.5", reviews: "12 ألف" },
+  { id: "p83", name: "معقّم يدين ديتول 250مل", categoryId: "d3c7", weight: "عبوة", price: 3000, mrp: 4000, stock: 110, rating: "4.6", reviews: "40 ألف" },
+  { id: "p84", name: "كمامات طبية معقمة 50 حبة", categoryId: "d3c7", weight: "علبة", price: 3500, mrp: 0, stock: 80, rating: "4.7", reviews: "90 ألف" },
+  { id: "p85", name: "منظف أرضيات فلاش برائحة الليمون 2 لتر", categoryId: "d4c1", weight: "عبوة 2 لتر", price: 3500, mrp: 4000, stock: 40, rating: "4.2", reviews: "1 ألف" },
+  { id: "p86", name: "كلوركس مبيّض ومعقّم 1 لتر", categoryId: "d4c1", weight: "عبوة 1 لتر", price: 2000, mrp: 0, stock: 60, rating: "4.3", reviews: "3 ألف" },
+  { id: "p87", name: "منظف زجاج ويندكس بخّاخ 500 مل", categoryId: "d4c1", weight: "بخّاخ 500 مل", price: 2500, mrp: 3000, stock: 35, rating: "4.4", reviews: "8 ألف" },
+  { id: "p88", name: "معجون جري مزيل الدهون 500 غرام", categoryId: "d4c1", weight: "عبوة 500 غ", price: 1750, mrp: 0, stock: 50, rating: "4.5", reviews: "12 ألف" },
+  { id: "p89", name: "مسحوق غسيل تايد أوتوماتيك 3 كغم", categoryId: "d4c2", weight: "كيس 3 كغم", price: 9000, mrp: 11000, stock: 30, rating: "4.6", reviews: "40 ألف" },
+  { id: "p90", name: "مسحوق غسيل أريال أوتوماتيك 4.5 كغم", categoryId: "d4c2", weight: "كيس 4.5 كغم", price: 13000, mrp: 15000, stock: 25, rating: "4.7", reviews: "90 ألف" },
+  { id: "p91", name: "برسيل جل سائل للغسيل 2.7 لتر", categoryId: "d4c2", weight: "عبوة 2.7 لتر", price: 11000, mrp: 0, stock: 20, rating: "4.2", reviews: "1 ألف" },
+  { id: "p92", name: "معطّر أقمشة داوني 1 لتر", categoryId: "d4c2", weight: "عبوة 1 لتر", price: 4500, mrp: 5500, stock: 40, rating: "4.3", reviews: "3 ألف" },
+  { id: "p93", name: "سائل غسيل صحون فيري ليمون 750 مل", categoryId: "d4c3", weight: "عبوة 750 مل", price: 2750, mrp: 3250, stock: 55, rating: "4.4", reviews: "8 ألف" },
+  { id: "p94", name: "ورق ألمنيوم فويل 30 متر", categoryId: "d4c3", weight: "لفّة 30 م", price: 3000, mrp: 0, stock: 45, rating: "4.5", reviews: "12 ألف" },
+  { id: "p95", name: "أطباق ورقية مقاس وسط 50 قطعة", categoryId: "d4c3", weight: "عبوة 50 قطعة", price: 2500, mrp: 3000, stock: 38, rating: "4.6", reviews: "40 ألف" },
+  { id: "p96", name: "إسفنج جلي مع ليفة 6 قطع", categoryId: "d4c3", weight: "عبوة 6 قطع", price: 1500, mrp: 0, stock: 70, rating: "4.7", reviews: "90 ألف" },
+  { id: "p97", name: "أكياس نفايات كبيرة سوداء 50 لتر 30 كيس", categoryId: "d4c4", weight: "رول 30 كيس", price: 2500, mrp: 3000, stock: 50, rating: "4.2", reviews: "1 ألف" },
+  { id: "p98", name: "أكياس نفايات متوسطة مع رباط 30 لتر", categoryId: "d4c4", weight: "رول 40 كيس", price: 2000, mrp: 0, stock: 48, rating: "4.3", reviews: "3 ألف" },
+  { id: "p99", name: "أكياس حفظ طعام شفافة 100 كيس", categoryId: "d4c4", weight: "عبوة 100 كيس", price: 1750, mrp: 0, stock: 42, rating: "4.4", reviews: "8 ألف" },
+  { id: "p100", name: "أكياس نفايات كبيرة جداً للحديقة 100 لتر", categoryId: "d4c4", weight: "رول 20 كيس", price: 3500, mrp: 4500, stock: 28, rating: "4.5", reviews: "12 ألف" },
+  { id: "p101", name: "طعام قطط ويسكاس بالتونة 400 غرام", categoryId: "d4c5", weight: "علبة 400 غ", price: 3000, mrp: 3750, stock: 36, rating: "4.6", reviews: "40 ألف" },
+  { id: "p102", name: "طعام كلاب بيديغري لحم بقري 1.5 كغم", categoryId: "d4c5", weight: "كيس 1.5 كغم", price: 9000, mrp: 11000, stock: 22, rating: "4.7", reviews: "90 ألف" },
+  { id: "p103", name: "رمل قطط معطّر متكتّل 5 لتر", categoryId: "d4c5", weight: "كيس 5 لتر", price: 4500, mrp: 0, stock: 30, rating: "4.2", reviews: "1 ألف" },
+  { id: "p104", name: "مكافآت قطط ويسكاس تمبتيشنز 60 غرام", categoryId: "d4c5", weight: "كيس 60 غ", price: 2000, mrp: 2500, stock: 40, rating: "4.3", reviews: "3 ألف" },
+  { id: "p105", name: "بطاريات إنرجايزر AA حجم كبير 4 قطع", categoryId: "d4c6", weight: "عبوة 4 قطع", price: 4000, mrp: 5000, stock: 50, rating: "4.4", reviews: "8 ألف" },
+  { id: "p106", name: "بطاريات دوراسيل AAA حجم صغير 4 قطع", categoryId: "d4c6", weight: "عبوة 4 قطع", price: 3750, mrp: 0, stock: 45, rating: "4.5", reviews: "12 ألف" },
+  { id: "p107", name: "لمبة LED موفّرة للطاقة 12 واط ضوء أبيض", categoryId: "d4c6", weight: "قطعة", price: 2500, mrp: 3500, stock: 60, rating: "4.6", reviews: "40 ألف" },
+  { id: "p108", name: "كشّاف يدوي LED قابل للشحن", categoryId: "d4c6", weight: "قطعة", price: 7500, mrp: 9000, stock: 25, rating: "4.7", reviews: "90 ألف" },
+  { id: "p109", name: "سماعة بلوتوث JBL Tune 510BT لاسلكية", categoryId: "d5c1", weight: "قطعة", price: 42000, mrp: 52000, stock: 35, rating: "4.2", reviews: "1 ألف" },
+  { id: "p110", name: "إيربودز Anker Soundcore Life P2", categoryId: "d5c1", weight: "قطعة", price: 38000, mrp: 0, stock: 40, rating: "4.3", reviews: "3 ألف" },
+  { id: "p111", name: "مكبر صوت بلوتوث JBL Go 3 محمول", categoryId: "d5c1", weight: "قطعة", price: 33000, mrp: 39000, stock: 28, rating: "4.4", reviews: "8 ألف" },
+  { id: "p112", name: "سماعة سلكية Samsung بقابس 3.5 ملم", categoryId: "d5c1", weight: "قطعة", price: 7000, mrp: 0, stock: 80, rating: "4.5", reviews: "12 ألف" },
+  { id: "p113", name: "شاحن سريع Anker 20W بمنفذ USB-C", categoryId: "d5c2", weight: "قطعة", price: 18000, mrp: 24000, stock: 50, rating: "4.6", reviews: "40 ألف" },
+  { id: "p114", name: "كيبل USB-C الى USB-C بطول متر", categoryId: "d5c2", weight: "قطعة", price: 6000, mrp: 0, stock: 120, rating: "4.7", reviews: "90 ألف" },
+  { id: "p115", name: "باور بانك Anker 10000 مللي أمبير", categoryId: "d5c2", weight: "قطعة", price: 35000, mrp: 45000, stock: 30, rating: "4.2", reviews: "1 ألف" },
+  { id: "p116", name: "كيبل لايتننغ للايفون بطول متر", categoryId: "d5c2", weight: "قطعة", price: 9000, mrp: 13000, stock: 70, rating: "4.3", reviews: "3 ألف" },
+  { id: "p117", name: "حافظة جوال شفافة سيليكون لـ iPhone 14", categoryId: "d5c3", weight: "قطعة", price: 8000, mrp: 0, stock: 60, rating: "4.4", reviews: "8 ألف" },
+  { id: "p118", name: "واقي شاشة زجاجي مقوى Samsung Galaxy", categoryId: "d5c3", weight: "قطعة", price: 5000, mrp: 8000, stock: 100, rating: "4.5", reviews: "12 ألف" },
+  { id: "p119", name: "حامل جوال للسيارة مغناطيسي", categoryId: "d5c3", weight: "قطعة", price: 12000, mrp: 16000, stock: 45, rating: "4.6", reviews: "40 ألف" },
+  { id: "p120", name: "حامل جوال مكتبي قابل للطي", categoryId: "d5c3", weight: "قطعة", price: 6500, mrp: 0, stock: 55, rating: "4.7", reviews: "90 ألف" },
+  { id: "p121", name: "مكعبات ليغو كلاسيك صندوق إبداعي", categoryId: "d5c4", weight: "علبة", price: 28000, mrp: 35000, stock: 25, rating: "4.2", reviews: "1 ألف" },
+  { id: "p122", name: "دمية باربي بفستان", categoryId: "d5c4", weight: "قطعة", price: 18000, mrp: 0, stock: 30, rating: "4.3", reviews: "3 ألف" },
+  { id: "p123", name: "سيارة ألعاب بريموت كنترول للأطفال", categoryId: "d5c4", weight: "قطعة", price: 25000, mrp: 32000, stock: 22, rating: "4.4", reviews: "8 ألف" },
+  { id: "p124", name: "مكعبات تركيب تعليمية ملونة للأطفال", categoryId: "d5c4", weight: "علبة", price: 14000, mrp: 0, stock: 40, rating: "4.5", reviews: "12 ألف" },
+  { id: "p125", name: "دفتر مدرسي 100 ورقة مسطّر", categoryId: "d5c5", weight: "قطعة", price: 1500, mrp: 2000, stock: 150, rating: "4.6", reviews: "40 ألف" },
+  { id: "p126", name: "علبة أقلام جاف Pilot أزرق 10 حبات", categoryId: "d5c5", weight: "علبة", price: 5000, mrp: 0, stock: 90, rating: "4.7", reviews: "90 ألف" },
+  { id: "p127", name: "آلة حاسبة Casio علمية fx-991", categoryId: "d5c5", weight: "قطعة", price: 22000, mrp: 28000, stock: 35, rating: "4.2", reviews: "1 ألف" },
+  { id: "p128", name: "علبة أقلام رصاص Staedtler 12 حبة", categoryId: "d5c5", weight: "علبة", price: 4000, mrp: 0, stock: 85, rating: "4.3", reviews: "3 ألف" },
 ];
 
 export const MOCK_ORDERS = [
@@ -167,7 +191,5 @@ export const MOCK_CUSTOMERS = [
   { name: "مصطفى علاء", phone: "0780 345 6789", orders: 1, spent: 12500, last: "اليوم", status: "جديد" },
   { name: "حيدر قاسم", phone: "0750 456 7890", orders: 15, spent: 188000, last: "قبل ٣ أيام", status: "نشط" },
   { name: "فاطمة جواد", phone: "0772 567 8901", orders: 3, spent: 41000, last: "قبل أسبوع", status: "غير نشط" },
-  { name: "كرار عبد", phone: "0781 678 9012", orders: 32, spent: 540000, last: "اليوم", status: "نشط" },
-  { name: "سجى نور", phone: "0773 789 0123", orders: 2, spent: 23000, last: "قبل يومين", status: "جديد" },
 ];
 export const MOCK_RIDERS = ["مصطفى", "حيدر", "علي", "كرار", "حسن"];
